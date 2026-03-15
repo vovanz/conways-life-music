@@ -27,6 +27,11 @@ const SHAPES: Record<string, { label: string; cells: [number, number][] }> = {
   rpent:   { label: 'R-pentomino',  cells: [[1,0],[2,0],[0,1],[1,1],[1,2]] },
 };
 
+/**
+ * Returns a shape's cell offsets together with the centering adjustments (ox, oy).
+ * Used both for preview rendering and final placement so the click point always
+ * lands at the visual center of the shape rather than its top-left corner.
+ */
 function shapeOffsets(id: string): { cells: [number, number][]; ox: number; oy: number } {
   const { cells } = SHAPES[id];
   const maxX = Math.max(...cells.map(([dx]) => dx));
@@ -47,6 +52,11 @@ interface SoundPreset {
   make(): ActiveSynth;
 }
 
+/**
+ * Wraps a PolySynth in the ActiveSynth interface.
+ * Most presets use PolySynth directly, so this avoids repeating the same
+ * two-method object literal for each one.
+ */
 function polyActive(synth: Tone.PolySynth): ActiveSynth {
   return {
     play(notes, dur) { synth.triggerAttackRelease(notes, dur); },
@@ -183,10 +193,19 @@ const SOUND_PRESETS: SoundPreset[] = [
 // ── Game of Life ───────────────────────────────────────────────────────────
 type Grid = Set<string>;
 
+/**
+ * Serialises a grid coordinate into the string key used by the sparse cell set.
+ * Keeping this in one place ensures encode/lookup always use the same format.
+ */
 function key(x: number, y: number): string {
   return `${x},${y}`;
 }
 
+/**
+ * Computes the next Conway generation from a sparse cell set.
+ * Only live cells and their neighbours are examined, so the cost scales
+ * with the live population rather than the size of the visible canvas.
+ */
 function nextGen(grid: Grid): Grid {
   const counts = new Map<string, number>();
   for (const k of grid) {
@@ -222,7 +241,10 @@ let hoverCell: { gx: number; gy: number } | null = null;
 let currentPreset: SoundPreset = SOUND_PRESETS[0];
 let activeSynth:   ActiveSynth = SOUND_PRESETS[0].make();
 
-// Seed some initial patterns
+/**
+ * Places a few well-known patterns into the starting grid so the app opens
+ * with something visually interesting rather than a blank canvas.
+ */
 function seed() {
   [[1,0],[2,1],[0,2],[1,2],[2,2]].forEach(([x,y]) => current.add(key(x, y)));  // glider
   [[9,10],[10,10],[11,10]].forEach(([x,y]) => current.add(key(x, y)));          // blinker
@@ -234,10 +256,20 @@ seed();
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const ctx    = canvas.getContext('2d')!;
 
+/**
+ * Returns the side length of a single cell in pixels.
+ * Derived from the viewport's smaller dimension so the 20×20 sequencer region
+ * always occupies 75% of the screen's short axis, regardless of aspect ratio.
+ */
 function cellSize(): number {
   return Math.min(window.innerWidth, window.innerHeight) * 0.75 / REGION;
 }
 
+/**
+ * Returns the canvas pixel coordinates of the top-left corner of the 20×20
+ * sequencer region. Used by both the renderer and the mouse-to-grid converter
+ * to keep the region visually centred at all times.
+ */
 function regionOffset(): { rx: number; ry: number } {
   const cs = cellSize();
   return {
@@ -246,17 +278,29 @@ function regionOffset(): { rx: number; ry: number } {
   };
 }
 
+/** Snaps the canvas to the current viewport size. Called on load and on every window resize. */
 function resize() {
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
 }
 
+/**
+ * Returns whether a grid cell should appear alive in the current frame.
+ * Inside the sequencer region, columns already passed by the scan line show
+ * the next generation's state — creating the progressive reveal animation.
+ * Everywhere else the current generation is shown.
+ */
 function isAlive(gx: number, gy: number): boolean {
   const inRegion = gx >= 0 && gx < REGION && gy >= 0 && gy < REGION;
   if (playing && inRegion && gx < scanCol) return next.has(key(gx, gy));
   return current.has(key(gx, gy));
 }
 
+/**
+ * Draws one frame: all visible cells, the sequencer region border, the scan
+ * line, and (while paused in shape-placement mode) a translucent preview of
+ * where the selected shape would land. Called every animation frame.
+ */
 function render() {
   const cs      = cellSize();
   const { rx, ry } = regionOffset();
@@ -319,6 +363,12 @@ function render() {
 }
 
 // ── Sequencer ──────────────────────────────────────────────────────────────
+/**
+ * Fired once per beat. Reads the next generation's state at the current scan
+ * column, triggers audio notes for every live cell found there, then advances
+ * the scan column. When the column wraps around, the generation is committed
+ * and a new one is pre-computed ready for the next sweep.
+ */
 function onBeat() {
   const notesToPlay: string[] = [];
   for (let row = 0; row < REGION; row++) {
@@ -335,6 +385,12 @@ function onBeat() {
 }
 
 // ── Main loop ──────────────────────────────────────────────────────────────
+/**
+ * The single requestAnimationFrame loop that drives the whole app.
+ * Checks whether enough time has elapsed for the next beat, then always
+ * re-renders. Separating beat timing from rendering keeps the visual smooth
+ * even when the beat interval doesn't align with the display refresh rate.
+ */
 function loop(ts: number) {
   if (playing && ts - lastBeat >= beatMs) {
     lastBeat += beatMs;
@@ -344,6 +400,11 @@ function loop(ts: number) {
   requestAnimationFrame(loop);
 }
 
+/**
+ * Begins playback: pre-computes the first next-generation, resets the scan
+ * column to 0, and anchors the beat clock. Always restarts from the left edge
+ * so the visual and audio are in sync regardless of when the user resumes.
+ */
 function startPlaying() {
   playing  = true;
   scanCol  = 0;
@@ -353,6 +414,7 @@ function startPlaying() {
   updateUI();
 }
 
+/** Pauses playback and updates the UI. The grid state and scan position are preserved but the scan line is hidden until the user resumes. */
 function stopPlaying() {
   playing = false;
   updateUI();
@@ -361,6 +423,11 @@ function stopPlaying() {
 // ── Cell editing ───────────────────────────────────────────────────────────
 let painting: boolean | null = null;
 
+/**
+ * Converts a mouse event's viewport coordinates into grid cell coordinates.
+ * The inverse of the pixel calculation in render(), using the same region
+ * offset so mouse interaction stays aligned with what's drawn on screen.
+ */
 function cellAt(e: MouseEvent): { gx: number; gy: number } {
   const cs      = cellSize();
   const { rx, ry } = regionOffset();
@@ -370,12 +437,22 @@ function cellAt(e: MouseEvent): { gx: number; gy: number } {
   };
 }
 
+/**
+ * Sets a single cell's state in the current grid while the app is paused.
+ * The `alive` flag is captured on mousedown so a drag either draws or erases
+ * consistently throughout the gesture.
+ */
 function paint(gx: number, gy: number, alive: boolean) {
   const k = key(gx, gy);
   if (alive) current.add(k);
   else       current.delete(k);
 }
 
+/**
+ * Stamps a preset shape into the current grid, centred on the given cell.
+ * Delegates centering to shapeOffsets() so placement matches the hover preview
+ * the user saw before clicking.
+ */
 function placeShape(id: string, gx: number, gy: number) {
   const { cells, ox, oy } = shapeOffsets(id);
   for (const [dx, dy] of cells) current.add(key(gx + dx - ox, gy + dy - oy));
@@ -441,6 +518,12 @@ for (const [id, { label }] of Object.entries(SHAPES)) {
   shapeContainer.appendChild(btn);
 }
 
+/**
+ * Syncs every UI element to the current app state.
+ * Called after any state change that affects the controls: play/pause,
+ * BPM change, shape selection, or clear. Centralising this avoids scattered
+ * per-element updates across the codebase.
+ */
 function updateUI() {
   playBtn.textContent = playing ? '⏸' : '▶';
   clearBtn.disabled   = playing;
