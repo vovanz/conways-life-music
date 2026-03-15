@@ -9,14 +9,17 @@ import {
   COLOR_SHAPE_PREVIEW,
   COLOR_SCAN_LINE,
 } from './colors';
-import { SCALES, buildNotes } from './scales';
+import { SCALES, CHROMATIC, buildNotes } from './scales';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const REGION = 20;
 const GAP    = 2;
 
-// Active scale — rebuilt when the user switches scales
-let NOTES: string[] = buildNotes(SCALES['majorPentatonic'], REGION);
+// Active scale / key / octave — rebuilt when any of these change
+let selectedScale  = SCALES['majorPentatonic'];
+let selectedKey    = 'C';
+let selectedOctave = 4;
+let NOTES: string[] = buildNotes(selectedScale, REGION, selectedKey, selectedOctave);
 
 // ── Game of Life ───────────────────────────────────────────────────────────
 type Grid = Set<string>;
@@ -316,6 +319,8 @@ const clearBtn   = document.getElementById('clearBtn') as HTMLButtonElement;
 const hint       = document.getElementById('hint')!;
 const soundSel   = document.getElementById('soundSelect') as HTMLSelectElement;
 const scaleSel   = document.getElementById('scaleSelect') as HTMLSelectElement;
+const keySel     = document.getElementById('keySelect') as HTMLSelectElement;
+const octaveSel  = document.getElementById('octaveSelect') as HTMLSelectElement;
 const shapeContainer = document.getElementById('shapeButtons')!;
 
 // Populate sound selector
@@ -344,8 +349,40 @@ for (const [id, scale] of Object.entries(SCALES)) {
 
 scaleSel.addEventListener('change', () => {
   const scale = SCALES[scaleSel.value];
-  if (scale) NOTES = buildNotes(scale, REGION);
+  if (scale) { selectedScale = scale; rebuildNotes(); }
 });
+
+// Populate key selector
+for (const note of CHROMATIC) {
+  const opt = document.createElement('option');
+  opt.value       = note;
+  opt.textContent = note;
+  keySel.appendChild(opt);
+}
+keySel.value = selectedKey;
+
+keySel.addEventListener('change', () => {
+  selectedKey = keySel.value;
+  rebuildNotes();
+});
+
+// Populate octave selector
+for (let oct = 2; oct <= 7; oct++) {
+  const opt = document.createElement('option');
+  opt.value       = String(oct);
+  opt.textContent = `C${oct}`;
+  octaveSel.appendChild(opt);
+}
+octaveSel.value = String(selectedOctave);
+
+octaveSel.addEventListener('change', () => {
+  selectedOctave = parseInt(octaveSel.value);
+  rebuildNotes();
+});
+
+function rebuildNotes() {
+  NOTES = buildNotes(selectedScale, REGION, selectedKey, selectedOctave);
+}
 
 // Populate shape buttons
 for (const [id, { label }] of Object.entries(SHAPES)) {

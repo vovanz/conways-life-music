@@ -26,12 +26,12 @@ Users can define a rectangular region of the grid that produces music. The Conwa
 - Visual indicator for the selected area: same style as currently used
 - Default on load: full canvas
 
-## 4. Key and octave selectors
+## 4. ~~Key and octave selectors~~ ✓
 
-Add controls to set the root note from which all scale notes are derived.
+~~Add controls to set the root note from which all scale notes are derived.~~
 
-- **Key picker**: full chromatic selector — C, C#, D, D#, E, F, F#, G, G#, A, A#, B
-- **Octave dropdown**: C2 through C7, default C4 (middle C)
+~~- **Key picker**: full chromatic selector — C, C#, D, D#, E, F, F#, G, G#, A, A#, B~~
+~~- **Octave dropdown**: C2 through C7, default C4 (middle C)~~
 
 ## 5. ~~Split diatonic into major and minor~~ ✓
 

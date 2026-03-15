@@ -40,6 +40,8 @@ The synth is a `PolySynth` using a triangle oscillator with a short envelope, so
 |---|---|
 | `Space` or `▶` button | Play / pause |
 | `−` / `+` buttons | Decrease / increase BPM by 10 (range: 40–480, default: 240) |
+| Key dropdown | Root note for the scale (C–B chromatic, default C) |
+| Octave dropdown | Base octave of the lowest note (C2–C7, default C4) |
 | Click or drag (while paused) | Toggle cells alive / dead |
 
 When paused, the scan line disappears. Pressing play restarts the sweep from column 0.
