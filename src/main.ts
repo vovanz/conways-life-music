@@ -414,51 +414,8 @@ document.addEventListener('keydown', async e => {
   }
 });
 
-// ── Draggable UI ───────────────────────────────────────────────────────────
-const ui = document.getElementById('ui')!;
-
-/** Positions the UI panel at the bottom-centre of the viewport on first load. */
-function initUIPosition() {
-  const rect = ui.getBoundingClientRect();
-  ui.style.left = `${(window.innerWidth  - rect.width)  / 2}px`;
-  ui.style.top  = `${(window.innerHeight - rect.height) - 24}px`;
-}
-
-let draggingUI = false;
-let dragOffX   = 0;
-let dragOffY   = 0;
-let dragW      = 0;
-let dragH      = 0;
-
-ui.addEventListener('mousedown', e => {
-  const target = e.target as HTMLElement;
-  if (target.closest('button, select, input')) return; // let controls handle their own clicks
-  draggingUI = true;
-  const rect = ui.getBoundingClientRect();
-  dragOffX = e.clientX - rect.left;
-  dragOffY = e.clientY - rect.top;
-  dragW    = rect.width;
-  dragH    = rect.height;
-  document.body.style.cursor = 'grabbing';
-  e.preventDefault();
-});
-
-document.addEventListener('mousemove', e => {
-  if (!draggingUI) return;
-  const x = Math.max(0, Math.min(window.innerWidth  - dragW, e.clientX - dragOffX));
-  const y = Math.max(0, Math.min(window.innerHeight - dragH, e.clientY - dragOffY));
-  ui.style.left = `${x}px`;
-  ui.style.top  = `${y}px`;
-});
-
-document.addEventListener('mouseup', () => {
-  if (!draggingUI) return;
-  draggingUI = false;
-  document.body.style.cursor = '';
-});
-
 // ── Boot ───────────────────────────────────────────────────────────────────
 resize();
 window.addEventListener('resize', resize);
 updateUI();
-requestAnimationFrame(ts => { initUIPosition(); loop(ts); });
+requestAnimationFrame(loop);
