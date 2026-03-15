@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conway's Life Music</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; }
+    canvas { display: block; }
+    #controls {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: rgba(20, 20, 20, 0.9);
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 0.5rem 1.25rem;
+      font-family: monospace;
+      color: #ccc;
+      user-select: none;
+    }
+    #controls button {
+      background: #2a2a2a;
+      color: #eee;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 0.3rem 0.7rem;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 1rem;
+      line-height: 1;
+    }
+    #controls button:hover { background: #3a3a3a; }
+    #bpmDisplay { width: 3ch; text-align: center; }
+    #hint {
+      position: fixed;
+      top: 1.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #555;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="hint">paused — click or drag to draw cells</div>
+  <div id="controls">
+    <button id="playBtn">▶</button>
+    <span style="color:#666">BPM</span>
+    <button id="bpmDown">−</button>
+    <span id="bpmDisplay">120</span>
+    <button id="bpmUp">+</button>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

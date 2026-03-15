@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tone.js Demo</title>
+  <script src="http://unpkg.com/tone"></script>
+  <style>
+    body {
+      font-family: monospace;
+      background: #111;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+      gap: 1rem;
+    }
+    h1 { margin-bottom: 0.5rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      max-width: 500px;
+      width: 100%;
+    }
+    button {
+      background: #222;
+      color: #eee;
+      border: 1px solid #444;
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 0.9rem;
+      border-radius: 4px;
+      text-align: left;
+    }
+    button:hover { background: #333; border-color: #888; }
+    button:active { background: #444; }
+    .label { font-size: 0.75rem; color: #888; margin-top: 0.2rem; }
+  </style>
+</head>
+<body>
+  <h1>Tone.js Sounds</h1>
+  <p style="color:#888; margin:0">Click to play</p>
+  <div class="grid" id="buttons"></div>
+
+  <script>
+    const sounds = [
+      {
+        name: "Piano (sampler)",
+        desc: "Real piano samples",
+        play: async () => {
+          const sampler = new Tone.Sampler({
+            urls: { A4: "A4.mp3" },
+            baseUrl: "https://tonejs.github.io/audio/salamander/",
+            onload: () => {
+              sampler.triggerAttackRelease(["C4", "E4", "G4"], "2n");
+            }
+          }).toDestination();
+        }
+      },
+      {
+        name: "Warm Synth",
+        desc: "Detuned oscillators",
+        play: () => {
+          const synth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "fatsawtooth", count: 3, spread: 20 },
+            envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1.2 },
+          }).toDestination();
+          synth.set({ volume: -10 });
+          synth.triggerAttackRelease(["C4", "E4", "G4", "B4"], "2n");
+        }
+      },
+      {
+        name: "Pluck",
+        desc: "Karplus-Strong string",
+        play: () => {
+          const synth = new Tone.PluckSynth({ attackNoise: 1, dampening: 4000, resonance: 0.98 }).toDestination();
+          ["C4", "E4", "G4", "B4", "C5"].forEach((note, i) => {
+            synth.triggerAttack(note, `+${i * 0.15}`);
+          });
+        }
+      },
+      {
+        name: "Bell",
+        desc: "FM synthesis",
+        play: () => {
+          const synth = new Tone.FMSynth({
+            harmonicity: 5.1,
+            modulationIndex: 32,
+            oscillator: { type: "sine" },
+            envelope: { attack: 0.001, decay: 1.5, sustain: 0, release: 0.5 },
+            modulation: { type: "sine" },
+            modulationEnvelope: { attack: 0.001, decay: 0.5, sustain: 0, release: 0.2 }
+          }).toDestination();
+          synth.triggerAttackRelease("C5", "4n");
+        }
+      },
+      {
+        name: "Pad",
+        desc: "Lush ambient chord",
+        play: () => {
+          const reverb = new Tone.Reverb({ decay: 4, wet: 0.7 }).toDestination();
+          const synth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "fatsine", count: 4, spread: 30 },
+            envelope: { attack: 0.8, decay: 0.5, sustain: 0.9, release: 2 },
+          }).connect(reverb);
+          synth.set({ volume: -12 });
+          synth.triggerAttackRelease(["C3", "G3", "C4", "E4", "G4"], "2n");
+        }
+      },
+      {
+        name: "Marimba",
+        desc: "Wooden bars feel",
+        play: () => {
+          const synth = new Tone.MetalSynth({
+            frequency: 200,
+            envelope: { attack: 0.001, decay: 0.4, release: 0.2 },
+            harmonicity: 5.1,
+            modulationIndex: 16,
+            resonance: 4000,
+            octaves: 0.5
+          }).toDestination();
+          synth.set({ volume: -10 });
+          const notes = [261.6, 329.6, 392, 523.2];
+          notes.forEach((freq, i) => {
+            synth.triggerAttack(freq, `+${i * 0.2}`);
+          });
+        }
+      },
+      {
+        name: "Bass",
+        desc: "Deep sub bass",
+        play: () => {
+          const synth = new Tone.Synth({
+            oscillator: { type: "triangle" },
+            envelope: { attack: 0.05, decay: 0.2, sustain: 0.8, release: 0.5 }
+          }).toDestination();
+          synth.set({ volume: -6 });
+          synth.triggerAttackRelease("C2", "4n");
+        }
+      },
+      {
+        name: "Arp",
+        desc: "Arpeggiated melody",
+        play: () => {
+          const synth = new Tone.Synth({
+            oscillator: { type: "triangle" },
+            envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.4 }
+          }).toDestination();
+          const notes = ["C4", "E4", "G4", "B4", "C5", "B4", "G4", "E4"];
+          notes.forEach((note, i) => {
+            synth.triggerAttackRelease(note, "16n", `+${i * 0.15}`);
+          });
+        }
+      }
+    ];
+
+    const container = document.getElementById("buttons");
+
+    sounds.forEach(({ name, desc, play }) => {
+      const btn = document.createElement("button");
+      btn.innerHTML = `<div>${name}</div><div class="label">${desc}</div>`;
+      btn.onclick = async () => {
+        await Tone.start();
+        play();
+      };
+      container.appendChild(btn);
+    });
+  </script>
+</body>
+</html>
