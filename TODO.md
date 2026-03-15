@@ -1,13 +1,13 @@
 # TODO
 
-## 1. Auto-placement of control bars
+## 1. ~~Auto-placement of control bars~~ ✓
 
-Control bars should automatically position themselves on the side of the screen with the most available space (left, right, top, or bottom of the interactive area).
+~~Control bars should automatically position themselves on the side of the screen with the most available space (left, right, top, or bottom of the interactive area).~~
 
-- Measure available space on all four sides on load and on every window resize
-- Place bars on the side with the most space
-- Items within the bar orient to match: vertical layout when placed on left/right, horizontal layout when placed on top/bottom
-- Reposition on every window resize
+~~- Measure available space on all four sides on load and on every window resize~~
+~~- Place bars on the side with the most space~~
+~~- Items within the bar orient to match: vertical layout when placed on left/right, horizontal layout when placed on top/bottom~~
+~~- Reposition on every window resize~~
 
 ## 2. ~~Speed control~~ ✓
 

@@ -113,6 +113,31 @@ function regionOffset(): { rx: number; ry: number } {
 function resize() {
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
+  positionUI();
+}
+
+/**
+ * Places the #ui panel on the side of the viewport with the most space
+ * relative to the active sequencer region. Re-runs on every resize.
+ */
+function positionUI() {
+  const cs  = cellSize();
+  const { rx, ry } = regionOffset();
+  const rw  = REGION * cs;
+  const rh  = REGION * cs;
+
+  const spaceLeft   = rx;
+  const spaceRight  = window.innerWidth  - (rx + rw);
+  const spaceTop    = ry;
+  const spaceBottom = window.innerHeight - (ry + rh);
+
+  const max = Math.max(spaceLeft, spaceRight, spaceTop, spaceBottom);
+
+  const uiEl = document.getElementById('ui')!;
+  if      (max === spaceRight)  uiEl.className = 'placement-right';
+  else if (max === spaceLeft)   uiEl.className = 'placement-left';
+  else if (max === spaceTop)    uiEl.className = 'placement-top';
+  else                          uiEl.className = 'placement-bottom';
 }
 
 /**

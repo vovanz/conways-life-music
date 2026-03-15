@@ -32,7 +32,8 @@ The synth is a `PolySynth` using a triangle oscillator with a short envelope, so
 - Full-screen canvas with black background
 - Cell size: `min(viewport width, viewport height) × 0.75 / 20`
 - Cells are rounded squares: white when alive, dark gray when dead
-- A thin border marks the active 20×20 sequencer region
+- A thin border marks the active sequencer region
+- The control panel auto-positions itself on the side of the screen with the most free space, and repositions on every window resize. Items within each bar switch between horizontal and vertical layout to match.
 
 ## Controls
 
