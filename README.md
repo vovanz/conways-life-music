@@ -23,7 +23,7 @@ The scan line doubles as a reveal animation for the next generation:
 
 ### Music
 
-When the scan line crosses a column, it plays a note for each **live cell** in that column (in the upcoming generation state). Notes are mapped to the **C-major pentatonic scale** (C D E G A) based on the cell's row — bottom row plays the lowest note, top row plays the highest, spanning four octaves (C3–A6).
+When the scan line crosses a column, it plays a note for each **live cell** in that column (in the upcoming generation state). Notes are mapped to the selected scale based on the cell's row — bottom row plays the lowest note, top row plays the highest. Available scales: Major Pentatonic, Minor Pentatonic, Major, Minor, Whole Tone, Octatonic, Chromatic.
 
 The synth is a `PolySynth` using a triangle oscillator with a short envelope, so chords are possible when multiple cells are alive in the same column.
 

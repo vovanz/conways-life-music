@@ -16,10 +16,15 @@ export const SCALES: Record<string, Scale> = {
     notes:       ['C', 'Eb', 'F', 'G', 'Bb'],
     startOctave: 3,   // 20 rows → C3–Bb6
   },
-  diatonic: {
-    label:       'Diatonic',
+  major: {
+    label:       'Major',
     notes:       ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
     startOctave: 3,   // 20 rows → C3–E5 (~2.8 octaves)
+  },
+  minor: {
+    label:       'Minor',
+    notes:       ['C', 'D', 'Eb', 'F', 'G', 'Ab', 'Bb'],
+    startOctave: 3,   // 20 rows → C3–Eb5 (~2.4 octaves)
   },
   wholeTone: {
     label:       'Whole tone',
