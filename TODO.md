@@ -9,13 +9,13 @@ Control bars should automatically position themselves on the side of the screen 
 - Items within the bar orient to match: vertical layout when placed on left/right, horizontal layout when placed on top/bottom
 - Reposition on every window resize
 
-## 2. Speed control
+## 2. ~~Speed control~~ ✓
 
-Replace the current BPM control with a unified speed control.
+~~Replace the current BPM control with a unified speed control.~~
 
-- Keep the current minimum BPM
-- Default: 240 BPM
-- Maximum: 480 BPM
+~~- Keep the current minimum BPM~~
+~~- Default: 240 BPM~~
+~~- Maximum: 480 BPM~~
 
 ## 3. Resizable interactive area
 

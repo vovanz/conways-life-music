@@ -60,8 +60,8 @@ let current: Grid = new Set();
 let next:    Grid = new Set();
 let playing        = false;
 let scanCol        = 0;
-let bpm            = 120;
-let beatMs         = 60000 / bpm;
+let bpm            = 240;
+let beatMs         = 60000 / 240;
 let lastBeat       = 0;
 let selectedShape: string | null = null;
 let hoverCell: { gx: number; gy: number } | null = null;
@@ -367,8 +367,9 @@ for (const [id, { label }] of Object.entries(SHAPES)) {
  * per-element updates across the codebase.
  */
 function updateUI() {
-  playBtn.textContent = playing ? '⏸' : '▶';
-  clearBtn.disabled   = playing;
+  playBtn.textContent    = playing ? '⏸' : '▶';
+  clearBtn.disabled      = playing;
+  bpmDisplay.textContent = String(bpm);
 
   // Shape buttons
   for (const btn of Array.from(shapeContainer.querySelectorAll('button'))) {
@@ -397,7 +398,7 @@ document.getElementById('bpmDown')!.addEventListener('click', () => {
 });
 
 document.getElementById('bpmUp')!.addEventListener('click', () => {
-  bpm    = Math.min(240, bpm + 10);
+  bpm    = Math.min(480, bpm + 10);
   beatMs = 60000 / bpm;
   bpmDisplay.textContent = String(bpm);
 });
