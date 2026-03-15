@@ -1,6 +1,14 @@
 import * as Tone from 'tone';
 import { SHAPES, shapeOffsets } from './shapes';
 import { SOUND_PRESETS, ActiveSynth, SoundPreset } from './sound_presets';
+import {
+  COLOR_BACKGROUND,
+  COLOR_CELL_DEAD,
+  COLOR_CELL_ALIVE,
+  COLOR_REGION_BORDER,
+  COLOR_SHAPE_PREVIEW,
+  COLOR_SCAN_LINE,
+} from './colors';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const REGION = 20;
@@ -131,7 +139,7 @@ function render() {
   const w = canvas.width;
   const h = canvas.height;
 
-  ctx.fillStyle = '#000';
+  ctx.fillStyle = COLOR_BACKGROUND;
   ctx.fillRect(0, 0, w, h);
 
   const inner  = cs - GAP;
@@ -147,7 +155,7 @@ function render() {
     for (let gy = minGy; gy <= maxGy; gy++) {
       const px = rx + gx * cs + GAP / 2;
       const py = ry + gy * cs + GAP / 2;
-      ctx.fillStyle = isAlive(gx, gy) ? '#f0f0f0' : '#1c1c1c';
+      ctx.fillStyle = isAlive(gx, gy) ? COLOR_CELL_ALIVE : COLOR_CELL_DEAD;
       ctx.beginPath();
       (ctx as any).roundRect(px, py, inner, inner, radius);
       ctx.fill();
@@ -157,7 +165,7 @@ function render() {
   // Shape preview
   if (!playing && selectedShape && hoverCell) {
     const { cells, ox, oy } = shapeOffsets(selectedShape);
-    ctx.fillStyle = 'rgba(100, 180, 255, 0.45)';
+    ctx.fillStyle = COLOR_SHAPE_PREVIEW;
     for (const [dx, dy] of cells) {
       const gx = hoverCell.gx + dx - ox;
       const gy = hoverCell.gy + dy - oy;
@@ -170,14 +178,14 @@ function render() {
   }
 
   // Highlighted region border
-  ctx.strokeStyle = '#444';
+  ctx.strokeStyle = COLOR_REGION_BORDER;
   ctx.lineWidth   = 1.5;
   ctx.strokeRect(rx - 1, ry - 1, REGION * cs + 2, REGION * cs + 2);
 
   // Scan line
   if (playing) {
     const lx = rx + scanCol * cs;
-    ctx.strokeStyle = 'rgba(220, 50, 50, 0.9)';
+    ctx.strokeStyle = COLOR_SCAN_LINE;
     ctx.lineWidth   = 2;
     ctx.beginPath();
     ctx.moveTo(lx, ry);
