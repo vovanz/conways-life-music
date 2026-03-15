@@ -9,18 +9,14 @@ import {
   COLOR_SHAPE_PREVIEW,
   COLOR_SCAN_LINE,
 } from './colors';
+import { SCALES, buildNotes } from './scales';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const REGION = 20;
 const GAP    = 2;
 
-// C-major pentatonic: row 0 (top) = highest, row 19 (bottom) = lowest
-const SCALE = ['C', 'D', 'E', 'G', 'A'] as const;
-const NOTES: string[] = Array.from({ length: REGION }, (_, row) => {
-  const idx    = REGION - 1 - row;
-  const octave = 3 + Math.floor(idx / 5);
-  return `${SCALE[idx % 5]}${octave}`;
-});
+// Active scale — rebuilt when the user switches scales
+let NOTES: string[] = buildNotes(SCALES['majorPentatonic'], REGION);
 
 // ── Game of Life ───────────────────────────────────────────────────────────
 type Grid = Set<string>;
@@ -319,6 +315,7 @@ const bpmDisplay = document.getElementById('bpmDisplay')!;
 const clearBtn   = document.getElementById('clearBtn') as HTMLButtonElement;
 const hint       = document.getElementById('hint')!;
 const soundSel   = document.getElementById('soundSelect') as HTMLSelectElement;
+const scaleSel   = document.getElementById('scaleSelect') as HTMLSelectElement;
 const shapeContainer = document.getElementById('shapeButtons')!;
 
 // Populate sound selector
@@ -335,6 +332,19 @@ soundSel.addEventListener('change', () => {
   activeSynth.dispose();
   currentPreset = preset;
   activeSynth   = preset.make();
+});
+
+// Populate scale selector
+for (const [id, scale] of Object.entries(SCALES)) {
+  const opt = document.createElement('option');
+  opt.value       = id;
+  opt.textContent = scale.label;
+  scaleSel.appendChild(opt);
+}
+
+scaleSel.addEventListener('change', () => {
+  const scale = SCALES[scaleSel.value];
+  if (scale) NOTES = buildNotes(scale, REGION);
 });
 
 // Populate shape buttons
