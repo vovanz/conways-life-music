@@ -72,6 +72,34 @@ let hoverCell: { gx: number; gy: number } | null = null;
 let currentPreset: SoundPreset = SOUND_PRESETS[0];
 let activeSynth:   ActiveSynth = SOUND_PRESETS[0].make();
 
+// ── Sequencer region ────────────────────────────────────────────────────────
+let regionX = 0, regionY = 0, regionW = REGION, regionH = REGION;
+
+// Resize handles — one per corner and edge midpoint
+const HANDLES = [
+  { id: 'tl', fx: 0,   fy: 0,   affL: true,  affR: false, affT: true,  affB: false },
+  { id: 'tc', fx: 0.5, fy: 0,   affL: false, affR: false, affT: true,  affB: false },
+  { id: 'tr', fx: 1,   fy: 0,   affL: false, affR: true,  affT: true,  affB: false },
+  { id: 'ml', fx: 0,   fy: 0.5, affL: true,  affR: false, affT: false, affB: false },
+  { id: 'mr', fx: 1,   fy: 0.5, affL: false, affR: true,  affT: false, affB: false },
+  { id: 'bl', fx: 0,   fy: 1,   affL: true,  affR: false, affT: false, affB: true  },
+  { id: 'bc', fx: 0.5, fy: 1,   affL: false, affR: false, affT: false, affB: true  },
+  { id: 'br', fx: 1,   fy: 1,   affL: false, affR: true,  affT: false, affB: true  },
+] as const;
+type Handle = typeof HANDLES[number];
+
+const HANDLE_CURSORS: Record<string, string> = {
+  tl: 'nw-resize', tc: 'n-resize',  tr: 'ne-resize',
+  ml: 'w-resize',                    mr: 'e-resize',
+  bl: 'sw-resize', bc: 's-resize',  br: 'se-resize',
+};
+
+// Area interaction state
+let draggingHandle: Handle | null = null;
+let selectingArea  = false;
+let selectStart:   { gx: number; gy: number } | null = null;
+let selectEnd:     { gx: number; gy: number } | null = null;
+
 /**
  * Places a few well-known patterns into the starting grid so the app opens
  * with something visually interesting rather than a blank canvas.
@@ -123,13 +151,11 @@ function resize() {
 function positionUI() {
   const cs  = cellSize();
   const { rx, ry } = regionOffset();
-  const rw  = REGION * cs;
-  const rh  = REGION * cs;
 
-  const spaceLeft   = rx;
-  const spaceRight  = window.innerWidth  - (rx + rw);
-  const spaceTop    = ry;
-  const spaceBottom = window.innerHeight - (ry + rh);
+  const spaceLeft   = rx + regionX * cs;
+  const spaceRight  = window.innerWidth  - (rx + (regionX + regionW) * cs);
+  const spaceTop    = ry + regionY * cs;
+  const spaceBottom = window.innerHeight - (ry + (regionY + regionH) * cs);
 
   const max = Math.max(spaceLeft, spaceRight, spaceTop, spaceBottom);
 
@@ -147,8 +173,9 @@ function positionUI() {
  * Everywhere else the current generation is shown.
  */
 function isAlive(gx: number, gy: number): boolean {
-  const inRegion = gx >= 0 && gx < REGION && gy >= 0 && gy < REGION;
-  if (playing && inRegion && gx < scanCol) return next.has(key(gx, gy));
+  const inRegion = gx >= regionX && gx < regionX + regionW &&
+                   gy >= regionY && gy < regionY + regionH;
+  if (playing && inRegion && gx < regionX + scanCol) return next.has(key(gx, gy));
   return current.has(key(gx, gy));
 }
 
@@ -202,19 +229,47 @@ function render() {
   }
 
   // Highlighted region border
+  const bx = rx + regionX * cs;
+  const by = ry + regionY * cs;
+  const bw = regionW * cs;
+  const bh = regionH * cs;
   ctx.strokeStyle = COLOR_REGION_BORDER;
   ctx.lineWidth   = 1.5;
-  ctx.strokeRect(rx - 1, ry - 1, REGION * cs + 2, REGION * cs + 2);
+  ctx.strokeRect(bx - 1, by - 1, bw + 2, bh + 2);
 
   // Scan line
   if (playing) {
-    const lx = rx + scanCol * cs;
+    const lx = rx + (regionX + scanCol) * cs;
     ctx.strokeStyle = COLOR_SCAN_LINE;
     ctx.lineWidth   = 2;
     ctx.beginPath();
-    ctx.moveTo(lx, ry);
-    ctx.lineTo(lx, ry + REGION * cs);
+    ctx.moveTo(lx, by);
+    ctx.lineTo(lx, by + bh);
     ctx.stroke();
+  }
+
+  // Resize handles (only when paused)
+  if (!playing) {
+    const HALF = 5;
+    ctx.fillStyle = COLOR_REGION_BORDER;
+    for (const h of HANDLES) {
+      const hx = bx + bw * h.fx;
+      const hy = by + bh * h.fy;
+      ctx.fillRect(hx - HALF, hy - HALF, HALF * 2, HALF * 2);
+    }
+  }
+
+  // Area selection preview
+  if (selectingArea && selectStart && selectEnd) {
+    const sx = rx + Math.min(selectStart.gx, selectEnd.gx) * cs;
+    const sy = ry + Math.min(selectStart.gy, selectEnd.gy) * cs;
+    const sw = (Math.abs(selectEnd.gx - selectStart.gx) + 1) * cs;
+    const sh = (Math.abs(selectEnd.gy - selectStart.gy) + 1) * cs;
+    ctx.strokeStyle = COLOR_REGION_BORDER;
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(sx - 1, sy - 1, sw + 2, sh + 2);
+    ctx.setLineDash([]);
   }
 }
 
@@ -226,14 +281,15 @@ function render() {
  * and a new one is pre-computed ready for the next sweep.
  */
 function onBeat() {
+  const col = regionX + scanCol;
   const notesToPlay: string[] = [];
-  for (let row = 0; row < REGION; row++) {
-    if (next.has(key(scanCol, row))) notesToPlay.push(NOTES[row]);
+  for (let row = 0; row < regionH; row++) {
+    if (next.has(key(col, regionY + row))) notesToPlay.push(NOTES[row]);
   }
   if (notesToPlay.length > 0) activeSynth.play(notesToPlay, currentPreset.dur);
 
   scanCol++;
-  if (scanCol >= REGION) {
+  if (scanCol >= regionW) {
     current = next;
     next    = nextGen(current);
     scanCol = 0;
@@ -276,6 +332,34 @@ function stopPlaying() {
   updateUI();
 }
 
+// ── Region resizing ────────────────────────────────────────────────────────
+/** Applies a new region, clamps scan column, rebuilds notes, repositions UI. */
+function applyRegion(x: number, y: number, w: number, h: number) {
+  regionX = x; regionY = y; regionW = w; regionH = h;
+  if (scanCol >= regionW) scanCol = 0;
+  rebuildNotes();
+  positionUI();
+}
+
+/** Returns the handle under the mouse, or null. */
+function handleAt(e: MouseEvent): Handle | null {
+  const cs = cellSize();
+  const { rx, ry } = regionOffset();
+  const bx = rx + regionX * cs;
+  const by = ry + regionY * cs;
+  const bw = regionW * cs;
+  const bh = regionH * cs;
+  const THRESHOLD = 10;
+  for (const h of HANDLES) {
+    const hx = bx + bw * h.fx;
+    const hy = by + bh * h.fy;
+    if (Math.abs(e.clientX - hx) <= THRESHOLD && Math.abs(e.clientY - hy) <= THRESHOLD) {
+      return h;
+    }
+  }
+  return null;
+}
+
 // ── Cell editing ───────────────────────────────────────────────────────────
 let painting: boolean | null = null;
 
@@ -316,26 +400,91 @@ function placeShape(id: string, gx: number, gy: number) {
 
 canvas.addEventListener('mousedown', e => {
   if (playing) return;
-  const { gx, gy } = cellAt(e);
-  if (selectedShape) {
-    placeShape(selectedShape, gx, gy);
+
+  // Draw new area
+  if (selectingArea) {
+    const { gx, gy } = cellAt(e);
+    selectStart = { gx, gy };
+    selectEnd   = { gx, gy };
     return;
   }
+
+  // Resize via handle
+  const h = handleAt(e);
+  if (h) { draggingHandle = h; return; }
+
+  // Shape placement / cell painting
+  const { gx, gy } = cellAt(e);
+  if (selectedShape) { placeShape(selectedShape, gx, gy); return; }
   painting = !current.has(key(gx, gy));
   paint(gx, gy, painting);
 });
 
 canvas.addEventListener('mousemove', e => {
   hoverCell = cellAt(e);
+
+  // Handle resize drag
+  if (draggingHandle) {
+    const cs = cellSize();
+    const { rx, ry } = regionOffset();
+    const mouseGx = Math.round((e.clientX - rx) / cs);
+    const mouseGy = Math.round((e.clientY - ry) / cs);
+    let x1 = regionX, y1 = regionY, x2 = regionX + regionW, y2 = regionY + regionH;
+    if (draggingHandle.affL) x1 = Math.min(mouseGx, x2 - 1);
+    if (draggingHandle.affR) x2 = Math.max(mouseGx, x1 + 1);
+    if (draggingHandle.affT) y1 = Math.min(mouseGy, y2 - 1);
+    if (draggingHandle.affB) y2 = Math.max(mouseGy, y1 + 1);
+    applyRegion(x1, y1, x2 - x1, y2 - y1);
+    canvas.style.cursor = HANDLE_CURSORS[draggingHandle.id];
+    return;
+  }
+
+  // Area selection preview
+  if (selectingArea && selectStart) {
+    selectEnd = hoverCell;
+    return;
+  }
+
+  // Update cursor: check for handle hover
+  if (!playing) {
+    if (selectingArea || selectedShape) {
+      canvas.style.cursor = 'crosshair';
+    } else {
+      const h = handleAt(e);
+      canvas.style.cursor = h ? HANDLE_CURSORS[h.id] : 'default';
+    }
+  }
+
+  // Cell painting drag
   if (playing || painting === null || selectedShape) return;
   paint(hoverCell.gx, hoverCell.gy, painting);
 });
 
 canvas.addEventListener('mouseleave', () => {
-  hoverCell = null;
-  painting  = null;
+  hoverCell      = null;
+  painting       = null;
+  draggingHandle = null;
+  if (selectingArea) { selectStart = null; selectEnd = null; }
 });
-canvas.addEventListener('mouseup', () => { painting = null; });
+
+canvas.addEventListener('mouseup', () => {
+  if (draggingHandle) { draggingHandle = null; return; }
+
+  if (selectingArea && selectStart && selectEnd) {
+    const x1 = Math.min(selectStart.gx, selectEnd.gx);
+    const y1 = Math.min(selectStart.gy, selectEnd.gy);
+    const x2 = Math.max(selectStart.gx, selectEnd.gx);
+    const y2 = Math.max(selectStart.gy, selectEnd.gy);
+    applyRegion(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
+    selectingArea = false;
+    selectStart   = null;
+    selectEnd     = null;
+    updateUI();
+    return;
+  }
+
+  painting = null;
+});
 
 // ── UI ─────────────────────────────────────────────────────────────────────
 const playBtn    = document.getElementById('playBtn')!;
@@ -347,6 +496,7 @@ const scaleSel   = document.getElementById('scaleSelect') as HTMLSelectElement;
 const keySel     = document.getElementById('keySelect') as HTMLSelectElement;
 const octaveSel  = document.getElementById('octaveSelect') as HTMLSelectElement;
 const shapeContainer = document.getElementById('shapeButtons')!;
+const selectAreaBtn  = document.getElementById('selectAreaBtn') as HTMLButtonElement;
 
 // Populate sound selector
 for (const preset of SOUND_PRESETS) {
@@ -406,8 +556,15 @@ octaveSel.addEventListener('change', () => {
 });
 
 function rebuildNotes() {
-  NOTES = buildNotes(selectedScale, REGION, selectedKey, selectedOctave);
+  NOTES = buildNotes(selectedScale, regionH, selectedKey, selectedOctave);
 }
+
+selectAreaBtn.addEventListener('click', () => {
+  if (playing) return;
+  selectingArea = !selectingArea;
+  if (selectingArea) { selectedShape = null; selectStart = null; selectEnd = null; }
+  updateUI();
+});
 
 // Populate shape buttons
 for (const [id, { label }] of Object.entries(SHAPES)) {
@@ -440,17 +597,23 @@ function updateUI() {
     b.classList.toggle('active', b.dataset['shape'] === selectedShape);
   }
 
+  // Select area button
+  selectAreaBtn.disabled = playing;
+  selectAreaBtn.classList.toggle('active', selectingArea);
+
   // Hint
   if (playing) {
     hint.textContent = '';
+  } else if (selectingArea) {
+    hint.textContent = 'drag to draw new area — Esc to cancel';
   } else if (selectedShape) {
     hint.textContent = `placing ${SHAPES[selectedShape].label} — click to place, Esc to cancel`;
   } else {
-    hint.textContent = 'paused — click or drag to draw cells';
+    hint.textContent = 'paused — click or drag to draw cells; drag handles to resize area';
   }
 
   // Cursor
-  canvas.style.cursor = (!playing && selectedShape) ? 'crosshair' : 'default';
+  canvas.style.cursor = (!playing && (selectedShape || selectingArea)) ? 'crosshair' : 'default';
 }
 
 document.getElementById('bpmDown')!.addEventListener('click', () => {
@@ -483,6 +646,9 @@ document.addEventListener('keydown', async e => {
   }
   if (e.code === 'Escape') {
     selectedShape = null;
+    selectingArea = false;
+    selectStart   = null;
+    selectEnd     = null;
     updateUI();
   }
 });

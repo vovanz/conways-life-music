@@ -17,14 +17,14 @@
 ~~- Default: 240 BPM~~
 ~~- Maximum: 480 BPM~~
 
-## 3. Resizable interactive area
+## 3. ~~Resizable interactive area~~ ✓
 
-Users can define a rectangular region of the grid that produces music. The Conway's Life algorithm runs on the full grid regardless; only the selected area is "listened to" for note generation.
+~~Users can define a rectangular region of the grid that produces music. The Conway's Life algorithm runs on the full grid regardless; only the selected area is "listened to" for note generation.~~
 
-- On the canvas, click and drag (or touch and drag on mobile) to draw a rectangle defining the interactive area
-- After drawing, drag handles appear on the edges and corners to resize the area
-- Visual indicator for the selected area: same style as currently used
-- Default on load: full canvas
+~~- On the canvas, click and drag (or touch and drag on mobile) to draw a rectangle defining the interactive area~~
+~~- After drawing, drag handles appear on the edges and corners to resize the area~~
+~~- Visual indicator for the selected area: same style as currently used~~
+~~- Default on load: full canvas~~
 
 ## 4. ~~Key and octave selectors~~ ✓
 

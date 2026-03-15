@@ -14,7 +14,7 @@ The grid is infinite and stored as a **sparse set** of live cell coordinates (`S
 
 ### The scan line sequencer
 
-A red vertical line sweeps left to right across a highlighted **20×20 region** in the center of the canvas, one column per beat (default 240 BPM, adjustable from 40 to 480). Each full sweep of 20 columns = one generation.
+A red vertical line sweeps left to right across a highlighted region in the center of the canvas (default 20×20, resizable), one column per beat (default 240 BPM, adjustable from 40 to 480). Each full sweep = one generation.
 
 The scan line doubles as a reveal animation for the next generation:
 
@@ -44,6 +44,8 @@ The synth is a `PolySynth` using a triangle oscillator with a short envelope, so
 | Key dropdown | Root note for the scale (C–B chromatic, default C) |
 | Octave dropdown | Base octave of the lowest note (C2–C7, default C4) |
 | Click or drag (while paused) | Toggle cells alive / dead |
+| Drag handles on region border | Resize the sequencer area |
+| "Select area" button + drag | Draw a new sequencer area from scratch |
 
 When paused, the scan line disappears. Pressing play restarts the sweep from column 0.
 
