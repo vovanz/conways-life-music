@@ -159,11 +159,20 @@ function positionUI() {
 
   const max = Math.max(spaceLeft, spaceRight, spaceTop, spaceBottom);
 
+  const MARGIN = 20;
   const uiEl = document.getElementById('ui')!;
-  if      (max === spaceRight)  uiEl.className = 'placement-right';
-  else if (max === spaceLeft)   uiEl.className = 'placement-left';
-  else if (max === spaceTop)    uiEl.className = 'placement-top';
-  else                          uiEl.className = 'placement-bottom';
+  uiEl.style.width = '';
+  if (max === spaceRight) {
+    uiEl.className  = 'placement-right';
+    uiEl.style.width = Math.floor(spaceRight - MARGIN * 2) + 'px';
+  } else if (max === spaceLeft) {
+    uiEl.className  = 'placement-left';
+    uiEl.style.width = Math.floor(spaceLeft - MARGIN * 2) + 'px';
+  } else if (max === spaceTop) {
+    uiEl.className = 'placement-top';
+  } else {
+    uiEl.className = 'placement-bottom';
+  }
 }
 
 /**
