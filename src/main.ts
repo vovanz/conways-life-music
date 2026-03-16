@@ -1,52 +1,22 @@
 import * as Tone from 'tone';
 import { SHAPES, shapeOffsets } from './shapes';
 import { SOUND_PRESETS, ActiveSynth, SoundPreset } from './sound_presets';
-import {
-  COLOR_BACKGROUND,
-  COLOR_CELL_DEAD,
-  COLOR_CELL_ALIVE,
-  COLOR_REGION_BORDER,
-  COLOR_SHAPE_PREVIEW,
-  COLOR_SCAN_LINE,
-} from './colors';
 import { SCALES, CHROMATIC, buildNotes } from './scales';
+import { Grid, key, nextGen } from './life';
+import {
+  GAP, BASE_CELL, DUR_BEATS, GlowEntry,
+  HANDLES, Handle, HANDLE_CURSORS,
+  RenderState, render,
+} from './render';
 
 // ── Constants ──────────────────────────────────────────────────────────────
-const REGION    = 20;
-const GAP       = 2;
-const BASE_CELL = 30; // cell size in pixels at zoom = 1
+const REGION = 20;
 
 // ── Active scale / key / octave ────────────────────────────────────────────
 let selectedScale  = SCALES['minorPentatonic'];
 let selectedKey    = 'C';
 let selectedOctave = 4;
 let NOTES: string[] = buildNotes(selectedScale, REGION, selectedKey, selectedOctave);
-
-// ── Game of Life ───────────────────────────────────────────────────────────
-type Grid = Set<string>;
-
-function key(x: number, y: number): string { return `${x},${y}`; }
-
-function nextGen(grid: Grid): Grid {
-  const counts = new Map<string, number>();
-  for (const k of grid) {
-    const comma = k.indexOf(',');
-    const x = parseInt(k.slice(0, comma));
-    const y = parseInt(k.slice(comma + 1));
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        if (dx === 0 && dy === 0) continue;
-        const nk = key(x + dx, y + dy);
-        counts.set(nk, (counts.get(nk) ?? 0) + 1);
-      }
-    }
-  }
-  const next: Grid = new Set();
-  for (const [k, n] of counts) {
-    if (n === 3 || (n === 2 && grid.has(k))) next.add(k);
-  }
-  return next;
-}
 
 // ── State ──────────────────────────────────────────────────────────────────
 let current: Grid = new Set();
@@ -72,30 +42,10 @@ let currentPreset: SoundPreset = defaultPreset;
 let activeSynth:   ActiveSynth = defaultPreset.make();
 
 // ── Glow ───────────────────────────────────────────────────────────────────
-interface GlowEntry { startMs: number; attackMs: number; holdMs: number; releaseMs: number; }
 const glowingCells = new Map<string, GlowEntry>();
-const DUR_BEATS: Record<string, number> = { '16n': 0.25, '8n': 0.5, '4n': 1.0, '2n': 2.0 };
 
 // ── Sequencer region ────────────────────────────────────────────────────────
 let regionX = 0, regionY = 0, regionW = REGION, regionH = REGION;
-
-const HANDLES = [
-  { id: 'tl', fx: 0,   fy: 0,   affL: true,  affR: false, affT: true,  affB: false },
-  { id: 'tc', fx: 0.5, fy: 0,   affL: false, affR: false, affT: true,  affB: false },
-  { id: 'tr', fx: 1,   fy: 0,   affL: false, affR: true,  affT: true,  affB: false },
-  { id: 'ml', fx: 0,   fy: 0.5, affL: true,  affR: false, affT: false, affB: false },
-  { id: 'mr', fx: 1,   fy: 0.5, affL: false, affR: true,  affT: false, affB: false },
-  { id: 'bl', fx: 0,   fy: 1,   affL: true,  affR: false, affT: false, affB: true  },
-  { id: 'bc', fx: 0.5, fy: 1,   affL: false, affR: false, affT: false, affB: true  },
-  { id: 'br', fx: 1,   fy: 1,   affL: false, affR: true,  affT: false, affB: true  },
-] as const;
-type Handle = typeof HANDLES[number];
-
-const HANDLE_CURSORS: Record<string, string> = {
-  tl: 'nw-resize', tc: 'n-resize',  tr: 'ne-resize',
-  ml: 'w-resize',                    mr: 'e-resize',
-  bl: 'sw-resize', bc: 's-resize',  br: 'se-resize',
-};
 
 let draggingHandle: Handle | null = null;
 let selectingArea  = false;
@@ -146,132 +96,6 @@ function resetCamera() {
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const ctx    = canvas.getContext('2d')!;
 
-function isAlive(gx: number, gy: number): boolean {
-  const inRegion = gx >= regionX && gx < regionX + regionW &&
-                   gy >= regionY && gy < regionY + regionH;
-  if (playing && inRegion && gx < regionX + scanCol) return next.has(key(gx, gy));
-  return current.has(key(gx, gy));
-}
-
-function render() {
-  const cs = cellSize();
-  const w  = canvas.width;
-  const h  = canvas.height;
-
-  ctx.fillStyle = COLOR_BACKGROUND;
-  ctx.fillRect(0, 0, w, h);
-
-  const inner  = Math.max(0, cs - GAP);
-  const radius = inner * 0.2;
-
-  const minGx = Math.floor(-camX / cs) - 1;
-  const minGy = Math.floor(-camY / cs) - 1;
-  const maxGx = Math.ceil((w - camX) / cs) + 1;
-  const maxGy = Math.ceil((h - camY) / cs) + 1;
-
-  // Cells
-  for (let gx = minGx; gx <= maxGx; gx++) {
-    for (let gy = minGy; gy <= maxGy; gy++) {
-      const px = camX + gx * cs + GAP / 2;
-      const py = camY + gy * cs + GAP / 2;
-      ctx.fillStyle = isAlive(gx, gy) ? COLOR_CELL_ALIVE : COLOR_CELL_DEAD;
-      ctx.beginPath();
-      (ctx as any).roundRect(px, py, inner, inner, radius);
-      ctx.fill();
-    }
-  }
-
-  // Glow pass
-  const nowMs = Date.now();
-  const toDelete: string[] = [];
-  for (const [k, g] of glowingCells) {
-    const elapsed = nowMs - g.startMs;
-    let intensity: number;
-    if (elapsed < g.attackMs) {
-      intensity = g.attackMs > 0 ? elapsed / g.attackMs : 1;
-    } else if (elapsed < g.holdMs) {
-      intensity = 1;
-    } else if (elapsed < g.holdMs + g.releaseMs) {
-      intensity = g.releaseMs > 0 ? 1 - (elapsed - g.holdMs) / g.releaseMs : 0;
-    } else {
-      toDelete.push(k);
-      continue;
-    }
-    if (intensity <= 0) continue;
-    const comma = k.indexOf(',');
-    const gx = parseInt(k.slice(0, comma));
-    const gy = parseInt(k.slice(comma + 1));
-    const px = camX + gx * cs + GAP / 2;
-    const py = camY + gy * cs + GAP / 2;
-    ctx.save();
-    ctx.shadowColor = `rgba(255, 200, 80, ${intensity})`;
-    ctx.shadowBlur  = inner * 1.5 * intensity;
-    ctx.fillStyle   = `rgba(255, 210, 100, ${intensity * 0.6})`;
-    ctx.beginPath();
-    (ctx as any).roundRect(px, py, inner, inner, radius);
-    ctx.fill();
-    ctx.restore();
-  }
-  for (const k of toDelete) glowingCells.delete(k);
-
-  // Shape preview
-  if (!playing && selectedShape && hoverCell) {
-    const { cells, ox, oy } = shapeOffsets(selectedShape, shapeRotations[selectedShape] ?? 0);
-    ctx.fillStyle = COLOR_SHAPE_PREVIEW;
-    for (const [dx, dy] of cells) {
-      const gx = hoverCell.gx + dx - ox;
-      const gy = hoverCell.gy + dy - oy;
-      const px = camX + gx * cs + GAP / 2;
-      const py = camY + gy * cs + GAP / 2;
-      ctx.beginPath();
-      (ctx as any).roundRect(px, py, inner, inner, radius);
-      ctx.fill();
-    }
-  }
-
-  // Region border
-  const bx = camX + regionX * cs;
-  const by = camY + regionY * cs;
-  const bw = regionW * cs;
-  const bh = regionH * cs;
-  ctx.strokeStyle = COLOR_REGION_BORDER;
-  ctx.lineWidth   = 1.5;
-  ctx.strokeRect(bx - 1, by - 1, bw + 2, bh + 2);
-
-  // Scan line
-  if (playing) {
-    const lx = camX + (regionX + scanCol) * cs;
-    ctx.strokeStyle = COLOR_SCAN_LINE;
-    ctx.lineWidth   = 2;
-    ctx.beginPath();
-    ctx.moveTo(lx, by);
-    ctx.lineTo(lx, by + bh);
-    ctx.stroke();
-  }
-
-  // Resize handles (only when paused)
-  if (!playing) {
-    const HALF = 5;
-    ctx.fillStyle = COLOR_REGION_BORDER;
-    for (const h of HANDLES) {
-      ctx.fillRect(bx + bw * h.fx - HALF, by + bh * h.fy - HALF, HALF * 2, HALF * 2);
-    }
-  }
-
-  // Area selection preview
-  if (selectingArea && selectStart && selectEnd) {
-    const sx = camX + Math.min(selectStart.gx, selectEnd.gx) * cs;
-    const sy = camY + Math.min(selectStart.gy, selectEnd.gy) * cs;
-    const sw = (Math.abs(selectEnd.gx - selectStart.gx) + 1) * cs;
-    const sh = (Math.abs(selectEnd.gy - selectStart.gy) + 1) * cs;
-    ctx.strokeStyle = COLOR_REGION_BORDER;
-    ctx.lineWidth   = 1.5;
-    ctx.setLineDash([4, 4]);
-    ctx.strokeRect(sx - 1, sy - 1, sw + 2, sh + 2);
-    ctx.setLineDash([]);
-  }
-}
-
 // ── Sequencer ──────────────────────────────────────────────────────────────
 function clampNote(note: string): string {
   const oct = parseInt(note.match(/\d+$/)?.[0] ?? '0');
@@ -308,8 +132,16 @@ function onBeat() {
 }
 
 // ── Main loop ──────────────────────────────────────────────────────────────
+/**
+ * The `requestAnimationFrame` driver. Renders a frame on every tick and fires
+ * `onBeat` whenever `beatMs` worth of wall-clock time has elapsed, accumulating
+ * the deficit so the beat rate stays accurate even if a frame is late.
+ */
 function loop(ts: number) {
-  render();
+  render({ canvas, ctx, current, next, playing, scanCol,
+           regionX, regionY, regionW, regionH,
+           camX, camY, zoom, selectedShape, shapeRotations, hoverCell,
+           glowingCells, selectingArea, selectStart, selectEnd });
   if (playing && ts - lastBeat >= beatMs) {
     lastBeat += beatMs;
     onBeat();
