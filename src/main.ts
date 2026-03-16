@@ -68,6 +68,11 @@ let lastTouchTime    = 0;
 let currentPreset: SoundPreset = SOUND_PRESETS[0];
 let activeSynth:   ActiveSynth = SOUND_PRESETS[0].make();
 
+// ── Glow ───────────────────────────────────────────────────────────────────
+interface GlowEntry { startMs: number; attackMs: number; holdMs: number; releaseMs: number; }
+const glowingCells = new Map<string, GlowEntry>();
+const DUR_BEATS: Record<string, number> = { '16n': 0.25, '8n': 0.5, '4n': 1.0, '2n': 2.0 };
+
 // ── Sequencer region ────────────────────────────────────────────────────────
 let regionX = 0, regionY = 0, regionW = REGION, regionH = REGION;
 
@@ -147,7 +152,7 @@ const ctx    = canvas.getContext('2d')!;
 function isAlive(gx: number, gy: number): boolean {
   const inRegion = gx >= regionX && gx < regionX + regionW &&
                    gy >= regionY && gy < regionY + regionH;
-  if (playing && inRegion && gx <= regionX + scanCol) return next.has(key(gx, gy));
+  if (playing && inRegion && gx < regionX + scanCol) return next.has(key(gx, gy));
   return current.has(key(gx, gy));
 }
 
@@ -178,6 +183,39 @@ function render() {
       ctx.fill();
     }
   }
+
+  // Glow pass
+  const nowMs = Date.now();
+  const toDelete: string[] = [];
+  for (const [k, g] of glowingCells) {
+    const elapsed = nowMs - g.startMs;
+    let intensity: number;
+    if (elapsed < g.attackMs) {
+      intensity = g.attackMs > 0 ? elapsed / g.attackMs : 1;
+    } else if (elapsed < g.holdMs) {
+      intensity = 1;
+    } else if (elapsed < g.holdMs + g.releaseMs) {
+      intensity = g.releaseMs > 0 ? 1 - (elapsed - g.holdMs) / g.releaseMs : 0;
+    } else {
+      toDelete.push(k);
+      continue;
+    }
+    if (intensity <= 0) continue;
+    const comma = k.indexOf(',');
+    const gx = parseInt(k.slice(0, comma));
+    const gy = parseInt(k.slice(comma + 1));
+    const px = camX + gx * cs + GAP / 2;
+    const py = camY + gy * cs + GAP / 2;
+    ctx.save();
+    ctx.shadowColor = `rgba(255, 200, 80, ${intensity})`;
+    ctx.shadowBlur  = inner * 1.5 * intensity;
+    ctx.fillStyle   = `rgba(255, 210, 100, ${intensity * 0.6})`;
+    ctx.beginPath();
+    (ctx as any).roundRect(px, py, inner, inner, radius);
+    ctx.fill();
+    ctx.restore();
+  }
+  for (const k of toDelete) glowingCells.delete(k);
 
   // Shape preview
   if (!playing && selectedShape && hoverCell) {
@@ -241,8 +279,16 @@ function render() {
 function onBeat() {
   const col = regionX + scanCol;
   const notesToPlay: string[] = [];
+  const noteDurMs = beatMs * (DUR_BEATS[currentPreset.dur] ?? 1);
+  const glowEntry: GlowEntry = {
+    startMs:   Date.now(),
+    attackMs:  currentPreset.attackMs,
+    holdMs:    currentPreset.attackMs + noteDurMs,
+    releaseMs: currentPreset.releaseMs,
+  };
   for (let row = 0; row < regionH; row++) {
-    if (next.has(key(col, regionY + row))) notesToPlay.push(NOTES[row]);
+    const k = key(col, regionY + row);
+    if (next.has(k)) { notesToPlay.push(NOTES[row]); glowingCells.set(k, glowEntry); }
   }
   if (notesToPlay.length > 0) activeSynth.play(notesToPlay, currentPreset.dur);
 
@@ -280,6 +326,7 @@ function startPlaying() {
 
 function stopPlaying() {
   playing = false;
+  glowingCells.clear();
   updateUI();
 }
 

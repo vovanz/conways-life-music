@@ -15,7 +15,9 @@ export interface SoundPreset {
   /** Tone.js note duration used by the sequencer for this sound (e.g. '8n'). */
   dur:      string;
   /** Milliseconds to pre-trigger audio before advancing the scan line. */
-  attackMs: number;
+  attackMs:  number;
+  /** Milliseconds for the glow to fade out after the note duration ends. */
+  releaseMs: number;
   make(): ActiveSynth;
 }
 
@@ -33,7 +35,7 @@ function polyActive(synth: Tone.PolySynth): ActiveSynth {
 
 export const SOUND_PRESETS: SoundPreset[] = [
   {
-    id: 'arp', name: 'Arp', dur: '8n', attackMs: 10,
+    id: 'arp', name: 'Arp', dur: '8n', attackMs: 10, releaseMs: 400,
     make() {
       const s = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'triangle' },
@@ -44,7 +46,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
     },
   },
   {
-    id: 'warm', name: 'Warm', dur: '4n', attackMs: 50,
+    id: 'warm', name: 'Warm', dur: '4n', attackMs: 50, releaseMs: 1200,
     make() {
       const s = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'fatsawtooth', count: 3, spread: 20 } as any,
@@ -55,7 +57,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
     },
   },
   {
-    id: 'pluck', name: 'Pluck', dur: '8n', attackMs: 0,
+    id: 'pluck', name: 'Pluck', dur: '8n', attackMs: 0, releaseMs: 500,
     make() {
       const pool = Array.from({ length: 8 }, () =>
         new Tone.PluckSynth({ attackNoise: 1, dampening: 4000, resonance: 0.98 }).toDestination()
@@ -73,7 +75,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
     },
   },
   {
-    id: 'bell', name: 'Bell', dur: '4n', attackMs: 1,
+    id: 'bell', name: 'Bell', dur: '4n', attackMs: 1, releaseMs: 500,
     make() {
       const s = new Tone.PolySynth(Tone.FMSynth, {
         harmonicity:        5.1,
@@ -87,7 +89,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
     },
   },
   {
-    id: 'pad', name: 'Pad', dur: '2n', attackMs: 300,
+    id: 'pad', name: 'Pad', dur: '2n', attackMs: 300, releaseMs: 2000,
     make() {
       const reverb = new Tone.Reverb({ decay: 4, wet: 0.6 }).toDestination();
       const s = new Tone.PolySynth(Tone.Synth, {
@@ -102,7 +104,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
     },
   },
   {
-    id: 'marimba', name: 'Marimba', dur: '8n', attackMs: 2,
+    id: 'marimba', name: 'Marimba', dur: '8n', attackMs: 2, releaseMs: 100,
     make() {
       const s = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'sine' },
@@ -113,7 +115,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
     },
   },
   {
-    id: 'bass', name: 'Bass', dur: '4n', attackMs: 50,
+    id: 'bass', name: 'Bass', dur: '4n', attackMs: 50, releaseMs: 500,
     make() {
       const s = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'triangle' },
@@ -124,7 +126,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
     },
   },
   {
-    id: 'piano', name: 'Piano', dur: '4n', attackMs: 10,
+    id: 'piano', name: 'Piano', dur: '4n', attackMs: 10, releaseMs: 1000,
     make() {
       let ready = false;
       const s = new Tone.Sampler({
