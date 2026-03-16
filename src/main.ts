@@ -333,7 +333,7 @@ function stopPlaying() {
 
 // ── Region ─────────────────────────────────────────────────────────────────
 function applyRegion(x: number, y: number, w: number, h: number) {
-  regionX = x; regionY = y; regionW = w; regionH = h;
+  regionX = x; regionY = y; regionW = w; regionH = Math.min(h, 64);
   if (scanCol >= regionW) scanCol = 0;
   rebuildNotes();
 }

@@ -1,5 +1,14 @@
 import * as Tone from 'tone';
 
+/** Shared compressor — all presets route through this before the destination. */
+export const compressor = new Tone.Compressor({
+  threshold: -12,
+  ratio:     4,
+  attack:    0.003,
+  release:   0.25,
+  knee:      6,
+}).toDestination();
+
 /** A live synth instance tied to the currently selected sound preset. */
 export interface ActiveSynth {
   /** Play a set of notes for the given duration (e.g. '8n', '4n'). */
@@ -37,10 +46,10 @@ export const SOUND_PRESETS: SoundPreset[] = [
   {
     id: 'arp', name: 'Arp', dur: '8n', attackMs: 10, releaseMs: 400,
     make() {
-      const s = new Tone.PolySynth(Tone.Synth, {
+      const s = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 64,
         oscillator: { type: 'triangle' },
         envelope:   { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.4 },
-      }).toDestination();
+      }).connect(compressor);
       s.set({ volume: -10 });
       return polyActive(s);
     },
@@ -48,10 +57,10 @@ export const SOUND_PRESETS: SoundPreset[] = [
   {
     id: 'warm', name: 'Warm', dur: '4n', attackMs: 50, releaseMs: 1200,
     make() {
-      const s = new Tone.PolySynth(Tone.Synth, {
+      const s = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 64,
         oscillator: { type: 'fatsawtooth', count: 3, spread: 20 } as any,
         envelope:   { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1.2 },
-      }).toDestination();
+      }).connect(compressor);
       s.set({ volume: -10 });
       return polyActive(s);
     },
@@ -60,7 +69,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
     id: 'pluck', name: 'Pluck', dur: '8n', attackMs: 0, releaseMs: 500,
     make() {
       const pool = Array.from({ length: 8 }, () =>
-        new Tone.PluckSynth({ attackNoise: 1, dampening: 4000, resonance: 0.98 }).toDestination()
+        new Tone.PluckSynth({ attackNoise: 1, dampening: 4000, resonance: 0.98 }).connect(compressor)
       );
       let idx = 0;
       return {
@@ -77,22 +86,22 @@ export const SOUND_PRESETS: SoundPreset[] = [
   {
     id: 'bell', name: 'Bell', dur: '4n', attackMs: 1, releaseMs: 500,
     make() {
-      const s = new Tone.PolySynth(Tone.FMSynth, {
+      const s = new Tone.PolySynth(Tone.FMSynth, { maxPolyphony: 64,
         harmonicity:        5.1,
         modulationIndex:    32,
         oscillator:         { type: 'sine' },
         envelope:           { attack: 0.001, decay: 1.5, sustain: 0, release: 0.5 },
         modulation:         { type: 'sine' },
         modulationEnvelope: { attack: 0.001, decay: 0.5, sustain: 0, release: 0.2 },
-      } as any).toDestination();
+      } as any).connect(compressor);
       return polyActive(s);
     },
   },
   {
     id: 'pad', name: 'Pad', dur: '2n', attackMs: 300, releaseMs: 2000,
     make() {
-      const reverb = new Tone.Reverb({ decay: 4, wet: 0.6 }).toDestination();
-      const s = new Tone.PolySynth(Tone.Synth, {
+      const reverb = new Tone.Reverb({ decay: 4, wet: 0.6 }).connect(compressor);
+      const s = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 64,
         oscillator: { type: 'fatsine', count: 4, spread: 30 } as any,
         envelope:   { attack: 0.3, decay: 0.5, sustain: 0.9, release: 2 },
       }).connect(reverb);
@@ -106,10 +115,10 @@ export const SOUND_PRESETS: SoundPreset[] = [
   {
     id: 'marimba', name: 'Marimba', dur: '8n', attackMs: 2, releaseMs: 100,
     make() {
-      const s = new Tone.PolySynth(Tone.Synth, {
+      const s = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 64,
         oscillator: { type: 'sine' },
         envelope:   { attack: 0.002, decay: 0.6, sustain: 0, release: 0.1 },
-      }).toDestination();
+      }).connect(compressor);
       s.set({ volume: -8 });
       return polyActive(s);
     },
@@ -117,10 +126,10 @@ export const SOUND_PRESETS: SoundPreset[] = [
   {
     id: 'bass', name: 'Bass', dur: '4n', attackMs: 50, releaseMs: 500,
     make() {
-      const s = new Tone.PolySynth(Tone.Synth, {
+      const s = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 64,
         oscillator: { type: 'triangle' },
         envelope:   { attack: 0.05, decay: 0.2, sustain: 0.8, release: 0.5 },
-      }).toDestination();
+      }).connect(compressor);
       s.set({ volume: -6 });
       return polyActive(s);
     },
@@ -133,9 +142,14 @@ export const SOUND_PRESETS: SoundPreset[] = [
         urls:    { A4: 'A4.mp3' },
         baseUrl: 'https://tonejs.github.io/audio/salamander/',
         onload:  () => { ready = true; },
-      }).toDestination();
+      }).connect(compressor);
+      // Salamander samples span A0–C8; filter notes outside that range.
+      const inRange = (n: string) => {
+        const oct = parseInt(n.match(/\d+$/)?.[0] ?? '99');
+        return oct >= 0 && oct <= 8;
+      };
       return {
-        play(notes, dur) { if (ready) s.triggerAttackRelease(notes, dur); },
+        play(notes, dur) { if (ready) { const safe = notes.filter(inRange); if (safe.length) s.triggerAttackRelease(safe, dur); } },
         dispose()        { s.dispose(); },
       };
     },
