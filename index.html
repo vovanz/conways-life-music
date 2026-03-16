@@ -9,9 +9,27 @@
     body { background: #000; overflow: hidden; }
     canvas { display: block; }
 
+    /* ── Pause overlay ── */
+    #pauseOverlay {
+      display: none;
+      position: fixed; inset: 0;
+      z-index: 1;
+      background: rgba(0, 0, 0, 0.25);
+      align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    #pauseOverlay span {
+      font-family: monospace;
+      font-size: clamp(1.5rem, 5vw, 3rem);
+      font-weight: bold;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 0.15em;
+    }
+
     /* ── Shared bar styles ── */
     .bar {
       position: fixed;
+      z-index: 2;
       display: flex;
       align-items: center;
       gap: 0.6rem;
@@ -104,6 +122,7 @@
 </head>
 <body>
   <canvas id="canvas"></canvas>
+  <div id="pauseOverlay"><span>PAUSE TO EDIT</span></div>
   <div id="hint"></div>
 
   <!-- Bar 1: transport + sound + scale + key -->

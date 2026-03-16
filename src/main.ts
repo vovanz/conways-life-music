@@ -889,12 +889,26 @@ function onFirstPlay() {
   }
 }
 
-// Blink pause when user pokes a button that's disabled because we're playing
+// Blink pause + show overlay when user pokes a button disabled because we're playing
+const pauseOverlay = document.getElementById('pauseOverlay')!;
+
+function showPauseOverlay() { pauseOverlay.style.display = 'flex'; }
+function hidePauseOverlay() { pauseOverlay.style.display = 'none'; }
+
+document.addEventListener('pointerup',     hidePauseOverlay);
+document.addEventListener('pointercancel', hidePauseOverlay);
+
+function onInactiveBtn() {
+  if (!playing) return;
+  blinkPause();
+  showPauseOverlay();
+}
+
 [clearBtn, clearSelBtn, randomBtn].forEach(btn => {
-  btn.addEventListener('pointerdown', () => { if (playing) blinkPause(); });
+  btn.addEventListener('pointerdown', onInactiveBtn);
 });
-selectAreaBtn.addEventListener('pointerdown', () => { if (playing) blinkPause(); });
-shapeContainer.addEventListener('pointerdown', () => { if (playing) blinkPause(); });
+selectAreaBtn.addEventListener('pointerdown', onInactiveBtn);
+shapeContainer.addEventListener('pointerdown', onInactiveBtn);
 
 playBtn.addEventListener('click', async () => {
   await Tone.start();
