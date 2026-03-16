@@ -524,7 +524,14 @@ canvas.addEventListener('touchstart', e => {
   touchMoved   = isMultitouch;
 
   if (e.touches.length === 1) {
-    if (paintMode && !selectedShape && !selectingArea && !playing) {
+    if (selectingArea && !playing) {
+      const { gx, gy } = pixelToCell(e.touches[0].clientX, e.touches[0].clientY);
+      selectStart = { gx, gy }; selectEnd = { gx, gy };
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      return;
+    }
+    if (paintMode && !selectedShape && !playing) {
       const now = Date.now();
       if (now - lastTouchTime < 300) {
         isDoubleClickPan = true;
@@ -553,6 +560,12 @@ canvas.addEventListener('touchstart', e => {
 
 canvas.addEventListener('touchmove', e => {
   e.preventDefault();
+
+  if (selectingArea && selectStart && e.touches.length === 1) {
+    selectEnd = pixelToCell(e.touches[0].clientX, e.touches[0].clientY);
+    touchMoved = true;
+    return;
+  }
 
   if (isDoubleClickPan && e.touches.length === 1) {
     camX = touchCamX + (e.touches[0].clientX - touchStartX);
@@ -588,6 +601,18 @@ canvas.addEventListener('touchmove', e => {
 }, { passive: false });
 
 canvas.addEventListener('touchend', e => {
+  if (selectingArea && selectStart && selectEnd) {
+    if (touchMoved) {
+      const x1 = Math.min(selectStart.gx, selectEnd.gx);
+      const y1 = Math.min(selectStart.gy, selectEnd.gy);
+      const x2 = Math.max(selectStart.gx, selectEnd.gx);
+      const y2 = Math.max(selectStart.gy, selectEnd.gy);
+      applyRegion(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
+      selectingArea = false; selectStart = null; selectEnd = null;
+      touchMoved = false; updateUI();
+    }
+    return;
+  }
   if (isDoubleClickPan) {
     if (e.touches.length === 0) isDoubleClickPan = false;
     return;
