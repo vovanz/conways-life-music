@@ -58,6 +58,12 @@ let beatMs         = 60000 / 240;
 let lastBeat       = 0;
 let selectedShape: string | null = null;
 let hoverCell: { gx: number; gy: number } | null = null;
+let paintMode        = false;
+let isPainting       = false;
+let lastPaintedCell: string | null = null;
+let isDoubleClickPan = false;
+let lastClickTime    = 0;
+let lastTouchTime    = 0;
 
 let currentPreset: SoundPreset = SOUND_PRESETS[0];
 let activeSynth:   ActiveSynth = SOUND_PRESETS[0].make();
@@ -299,6 +305,11 @@ function toggleCell(gx: number, gy: number) {
   if (current.has(k)) current.delete(k); else current.add(k);
 }
 
+function paintCell(gx: number, gy: number) {
+  const k = key(gx, gy);
+  if (k !== lastPaintedCell) { current.add(k); lastPaintedCell = k; }
+}
+
 function placeShape(id: string, gx: number, gy: number) {
   const { cells, ox, oy } = shapeOffsets(id);
   for (const [dx, dy] of cells) current.add(key(gx + dx - ox, gy + dy - oy));
@@ -317,6 +328,22 @@ canvas.addEventListener('mousedown', e => {
   if (!playing) {
     const h = handleAt(e);
     if (h) { draggingHandle = h; return; }
+  }
+
+  if (paintMode && !selectedShape && !selectingArea && !playing) {
+    const now = Date.now();
+    if (now - lastClickTime < 300) {
+      isDoubleClickPan = true;
+      panStartX = e.clientX; panStartY = e.clientY;
+      camStartX = camX;      camStartY = camY;
+      lastClickTime = 0;
+    } else {
+      lastClickTime = now;
+      isPainting = true; lastPaintedCell = null;
+      const { gx, gy } = pixelToCell(e.clientX, e.clientY);
+      paintCell(gx, gy);
+    }
+    return;
   }
 
   pointerDownX = e.clientX; pointerDownY = e.clientY;
@@ -348,6 +375,19 @@ canvas.addEventListener('mousemove', e => {
     return;
   }
 
+  if (isDoubleClickPan) {
+    camX = camStartX + (e.clientX - panStartX);
+    camY = camStartY + (e.clientY - panStartY);
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+
+  if (isPainting) {
+    const { gx, gy } = pixelToCell(e.clientX, e.clientY);
+    paintCell(gx, gy);
+    return;
+  }
+
   if (selectingArea && selectStart && isPanning) {
     selectEnd = hoverCell;
     pointerMoved = true;
@@ -364,7 +404,9 @@ canvas.addEventListener('mousemove', e => {
 
   // Cursor feedback
   if (!playing) {
-    if (selectingArea || selectedShape) {
+    if (paintMode && !selectedShape && !selectingArea) {
+      canvas.style.cursor = 'crosshair';
+    } else if (selectingArea || selectedShape) {
       canvas.style.cursor = 'crosshair';
     } else if (isPanning && pointerMoved) {
       canvas.style.cursor = 'grabbing';
@@ -377,6 +419,8 @@ canvas.addEventListener('mousemove', e => {
 
 canvas.addEventListener('mouseup', e => {
   if (draggingHandle) { draggingHandle = null; return; }
+  if (isDoubleClickPan) { isDoubleClickPan = false; updateUI(); return; }
+  if (isPainting) { isPainting = false; lastPaintedCell = null; updateUI(); return; }
 
   if (selectingArea && selectStart && selectEnd && pointerMoved) {
     const x1 = Math.min(selectStart.gx, selectEnd.gx);
@@ -398,6 +442,7 @@ canvas.addEventListener('mouseup', e => {
 
 canvas.addEventListener('mouseleave', () => {
   hoverCell = null; isPanning = false; draggingHandle = null;
+  isPainting = false; isDoubleClickPan = false; lastPaintedCell = null;
   if (selectingArea) { selectStart = null; selectEnd = null; }
 });
 
@@ -426,6 +471,22 @@ canvas.addEventListener('touchstart', e => {
   touchMoved   = isMultitouch;
 
   if (e.touches.length === 1) {
+    if (paintMode && !selectedShape && !selectingArea && !playing) {
+      const now = Date.now();
+      if (now - lastTouchTime < 300) {
+        isDoubleClickPan = true;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchCamX = camX; touchCamY = camY;
+        lastTouchTime = 0;
+      } else {
+        lastTouchTime = now;
+        isPainting = true; lastPaintedCell = null;
+        const { gx, gy } = pixelToCell(e.touches[0].clientX, e.touches[0].clientY);
+        paintCell(gx, gy);
+      }
+      return;
+    }
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
     touchCamX   = camX; touchCamY = camY;
@@ -439,6 +500,20 @@ canvas.addEventListener('touchstart', e => {
 
 canvas.addEventListener('touchmove', e => {
   e.preventDefault();
+
+  if (isDoubleClickPan && e.touches.length === 1) {
+    camX = touchCamX + (e.touches[0].clientX - touchStartX);
+    camY = touchCamY + (e.touches[0].clientY - touchStartY);
+    return;
+  }
+
+  if (isPainting && e.touches.length === 1) {
+    const { gx, gy } = pixelToCell(e.touches[0].clientX, e.touches[0].clientY);
+    paintCell(gx, gy);
+    touchMoved = true;
+    return;
+  }
+
   if (e.touches.length === 1 && !isMultitouch) {
     const dx = e.touches[0].clientX - touchStartX;
     const dy = e.touches[0].clientY - touchStartY;
@@ -460,6 +535,14 @@ canvas.addEventListener('touchmove', e => {
 }, { passive: false });
 
 canvas.addEventListener('touchend', e => {
+  if (isDoubleClickPan) {
+    if (e.touches.length === 0) isDoubleClickPan = false;
+    return;
+  }
+  if (isPainting) {
+    if (e.touches.length === 0) { isPainting = false; lastPaintedCell = null; }
+    return;
+  }
   if (!touchMoved && !isMultitouch && !playing) {
     const t = e.changedTouches[0];
     const { gx, gy } = pixelToCell(t.clientX, t.clientY);
@@ -499,6 +582,7 @@ const keySel         = document.getElementById('keySelect') as HTMLSelectElement
 const octaveSel      = document.getElementById('octaveSelect') as HTMLSelectElement;
 const shapeContainer = document.getElementById('shapeButtons')!;
 const selectAreaBtn  = document.getElementById('selectAreaBtn') as HTMLButtonElement;
+const modeBtn        = document.getElementById('modeBtn') as HTMLButtonElement;
 
 for (const preset of SOUND_PRESETS) {
   const opt = document.createElement('option');
@@ -541,6 +625,11 @@ function rebuildNotes() {
   NOTES = buildNotes(selectedScale, regionH, selectedKey, selectedOctave);
 }
 
+modeBtn.addEventListener('click', () => {
+  paintMode = !paintMode;
+  updateUI();
+});
+
 selectAreaBtn.addEventListener('click', () => {
   if (playing) return;
   selectingArea = !selectingArea;
@@ -564,6 +653,12 @@ function updateUI() {
   clearBtn.disabled      = playing;
   bpmDisplay.textContent = String(bpm);
 
+  modeBtn.textContent = paintMode ? '🖌️' : '🖐️';
+  modeBtn.title = paintMode
+    ? 'Paint mode — drag to paint, double-click to pan'
+    : 'Drag mode — drag to pan, click to toggle';
+  modeBtn.classList.toggle('active', paintMode);
+
   for (const btn of Array.from(shapeContainer.querySelectorAll('button'))) {
     const b = btn as HTMLButtonElement;
     b.disabled = playing;
@@ -579,12 +674,15 @@ function updateUI() {
     hint.textContent = 'drag to draw new area — Esc to cancel';
   } else if (selectedShape) {
     hint.textContent = `placing ${SHAPES[selectedShape].label} — click to place, Esc to cancel`;
+  } else if (paintMode) {
+    hint.textContent = 'drag to paint · double-click to pan · scroll/pinch to zoom';
   } else {
     hint.textContent = 'click to toggle · drag to pan · scroll/pinch to zoom · drag handles to resize area';
   }
 
   canvas.style.cursor = (!playing && (selectedShape || selectingArea)) ? 'crosshair'
                       : playing ? 'default'
+                      : (paintMode && !selectedShape && !selectingArea) ? 'crosshair'
                       : 'grab';
 }
 
