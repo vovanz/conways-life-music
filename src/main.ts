@@ -639,6 +639,7 @@ const dragModeBtn    = document.getElementById('dragModeBtn') as HTMLButtonEleme
 const paintModeBtn   = document.getElementById('paintModeBtn') as HTMLButtonElement;
 const rotateCCWBtn   = document.getElementById('rotateCCWBtn') as HTMLButtonElement;
 const rotateCWBtn    = document.getElementById('rotateCWBtn') as HTMLButtonElement;
+const randomBtn      = document.getElementById('randomBtn') as HTMLButtonElement;
 
 for (const preset of SOUND_PRESETS) {
   const opt = document.createElement('option');
@@ -714,6 +715,7 @@ for (const [id, { label }] of Object.entries(SHAPES)) {
 function updateUI() {
   playBtn.textContent    = playing ? '⏸' : '▶';
   clearBtn.disabled      = playing;
+  randomBtn.disabled     = playing;
   bpmDisplay.textContent = String(bpm);
 
   dragModeBtn.classList.toggle('active', !paintMode);
@@ -756,7 +758,53 @@ document.getElementById('bpmUp')!.addEventListener('click', () => {
   bpm = Math.min(480, bpm + 10); beatMs = 60000 / bpm; bpmDisplay.textContent = String(bpm);
 });
 
+function advanceGen() {
+  if (playing) {
+    current = next;
+    next    = nextGen(current);
+    scanCol = 0;
+    lastBeat = performance.now();
+    glowingCells.clear();
+  } else {
+    current = nextGen(current);
+  }
+}
+
+{
+  const btn = document.getElementById('nextGenBtn')!;
+  let holdTimeout: ReturnType<typeof setTimeout> | null = null;
+  let holdInterval: ReturnType<typeof setInterval> | null = null;
+
+  function startHold() {
+    advanceGen();
+    holdTimeout = setTimeout(() => {
+      holdInterval = setInterval(advanceGen, 100);
+    }, 200);
+  }
+
+  function stopHold() {
+    if (holdTimeout)  { clearTimeout(holdTimeout);   holdTimeout  = null; }
+    if (holdInterval) { clearInterval(holdInterval); holdInterval = null; }
+  }
+
+  btn.addEventListener('mousedown', startHold);
+  btn.addEventListener('mouseup',   stopHold);
+  btn.addEventListener('mouseleave', stopHold);
+  btn.addEventListener('touchstart', e => { e.preventDefault(); startHold(); }, { passive: false });
+  btn.addEventListener('touchend',   stopHold);
+}
+
 clearBtn.addEventListener('click', () => { if (!playing) current = new Set(); });
+
+randomBtn.addEventListener('click', () => {
+  if (playing) return;
+  for (let gx = regionX; gx < regionX + regionW; gx++) {
+    for (let gy = regionY; gy < regionY + regionH; gy++) {
+      const k = key(gx, gy);
+      if (Math.random() < 0.3) current.add(k); else current.delete(k);
+    }
+  }
+});
 
 playBtn.addEventListener('click', async () => {
   await Tone.start();

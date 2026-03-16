@@ -65,6 +65,7 @@
       line-height: 1.4;
     }
     button:hover, select:hover { background: #333; }
+    #rotateCCWBtn, #rotateCWBtn { font-size: large; font-family: Arial; color: white; }
     button:disabled { opacity: 0.35; cursor: default; }
     button.active { background: #2a4a6a; border-color: #4a8abf; color: #9fd; }
 
@@ -94,6 +95,7 @@
   <!-- Bar 1: transport + sound + scale + key -->
   <div id="bar1" class="bar">
     <button id="playBtn">▶</button>
+    <button id="nextGenBtn" title="Skip to next generation">⏭</button>
     <div class="sep"></div>
     <span class="label">BPM</span>
     <button id="bpmDown">−</button>
@@ -111,6 +113,7 @@
     <select id="octaveSelect"></select>
     <div class="sep"></div>
     <button id="clearBtn" disabled>Clear</button>
+    <button id="randomBtn" disabled>Randomize</button>
   </div>
 
   <!-- Bar 2: mode + shapes + area selection -->
