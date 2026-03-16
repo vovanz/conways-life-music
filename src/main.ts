@@ -57,6 +57,7 @@ let bpm            = 240;
 let beatMs         = 60000 / 240;
 let lastBeat       = 0;
 let selectedShape: string | null = null;
+const shapeRotations: Record<string, number> = {}; // 0–3 CW rotations per shape
 let hoverCell: { gx: number; gy: number } | null = null;
 let paintMode        = false;
 let isPainting       = false;
@@ -219,7 +220,7 @@ function render() {
 
   // Shape preview
   if (!playing && selectedShape && hoverCell) {
-    const { cells, ox, oy } = shapeOffsets(selectedShape);
+    const { cells, ox, oy } = shapeOffsets(selectedShape, shapeRotations[selectedShape] ?? 0);
     ctx.fillStyle = COLOR_SHAPE_PREVIEW;
     for (const [dx, dy] of cells) {
       const gx = hoverCell.gx + dx - ox;
@@ -363,7 +364,7 @@ function paintCell(gx: number, gy: number) {
 }
 
 function placeShape(id: string, gx: number, gy: number) {
-  const { cells, ox, oy } = shapeOffsets(id);
+  const { cells, ox, oy } = shapeOffsets(id, shapeRotations[id] ?? 0);
   for (const [dx, dy] of cells) current.add(key(gx + dx - ox, gy + dy - oy));
 }
 
@@ -636,6 +637,8 @@ const shapeContainer = document.getElementById('shapeButtons')!;
 const selectAreaBtn  = document.getElementById('selectAreaBtn') as HTMLButtonElement;
 const dragModeBtn    = document.getElementById('dragModeBtn') as HTMLButtonElement;
 const paintModeBtn   = document.getElementById('paintModeBtn') as HTMLButtonElement;
+const rotateCCWBtn   = document.getElementById('rotateCCWBtn') as HTMLButtonElement;
+const rotateCWBtn    = document.getElementById('rotateCWBtn') as HTMLButtonElement;
 
 for (const preset of SOUND_PRESETS) {
   const opt = document.createElement('option');
@@ -681,6 +684,15 @@ function rebuildNotes() {
 dragModeBtn.addEventListener('click', () => { paintMode = false; updateUI(); });
 paintModeBtn.addEventListener('click', () => { paintMode = true;  updateUI(); });
 
+rotateCCWBtn.addEventListener('click', () => {
+  if (!selectedShape) return;
+  shapeRotations[selectedShape] = ((shapeRotations[selectedShape] ?? 0) + 3) % 4;
+});
+rotateCWBtn.addEventListener('click', () => {
+  if (!selectedShape) return;
+  shapeRotations[selectedShape] = ((shapeRotations[selectedShape] ?? 0) + 1) % 4;
+});
+
 selectAreaBtn.addEventListener('click', () => {
   if (playing) return;
   selectingArea = !selectingArea;
@@ -706,6 +718,9 @@ function updateUI() {
 
   dragModeBtn.classList.toggle('active', !paintMode);
   paintModeBtn.classList.toggle('active', paintMode);
+
+  rotateCCWBtn.disabled = !selectedShape;
+  rotateCWBtn.disabled  = !selectedShape;
 
   for (const btn of Array.from(shapeContainer.querySelectorAll('button'))) {
     const b = btn as HTMLButtonElement;

@@ -12,13 +12,25 @@ export const SHAPES: Record<string, { label: string; cells: [number, number][] }
   rpent:   { label: 'R-pentomino',  cells: [[1,0],[2,0],[0,1],[1,1],[1,2]] },
 };
 
+/** Rotate cells 90° CW `rotations` times, normalized so min coords are 0. */
+function rotateCells(cells: [number, number][], rotations: number): [number, number][] {
+  let result = cells;
+  for (let i = 0; i < rotations % 4; i++) {
+    result = result.map(([dx, dy]) => [dy, -dx] as [number, number]);
+    const minX = Math.min(...result.map(([x]) => x));
+    const minY = Math.min(...result.map(([, y]) => y));
+    result = result.map(([x, y]) => [x - minX, y - minY] as [number, number]);
+  }
+  return result;
+}
+
 /**
  * Returns a shape's cell offsets together with the centering adjustments (ox, oy).
  * Used both for preview rendering and final placement so the click point always
  * lands at the visual center of the shape rather than its top-left corner.
  */
-export function shapeOffsets(id: string): { cells: [number, number][]; ox: number; oy: number } {
-  const { cells } = SHAPES[id];
+export function shapeOffsets(id: string, rotation = 0): { cells: [number, number][]; ox: number; oy: number } {
+  const cells = rotateCells(SHAPES[id].cells, rotation);
   const maxX = Math.max(...cells.map(([dx]) => dx));
   const maxY = Math.max(...cells.map(([, dy]) => dy));
   return { cells, ox: Math.floor(maxX / 2), oy: Math.floor(maxY / 2) };
