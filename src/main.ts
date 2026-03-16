@@ -340,7 +340,7 @@ function stopPlaying() {
 function applyRegion(x: number, y: number, w: number, h: number) {
   regionX = x; regionY = y; regionW = w; regionH = Math.min(h, 40);
   if (scanCol >= regionW) scanCol = 0;
-  rebuildNotes();
+  rebuildNotes(true);
 }
 
 function handleAt(e: { clientX: number; clientY: number }): Handle | null {
@@ -689,7 +689,7 @@ for (const [id, scale] of Object.entries(SCALES)) {
 }
 scaleSel.addEventListener('change', () => {
   const scale = SCALES[scaleSel.value];
-  if (scale) { selectedScale = scale; rebuildNotes(); }
+  if (scale) { selectedScale = scale; rebuildNotes(true); }
 });
 
 for (const note of CHROMATIC) {
@@ -698,7 +698,7 @@ for (const note of CHROMATIC) {
   keySel.appendChild(opt);
 }
 keySel.value = selectedKey;
-keySel.addEventListener('change', () => { selectedKey = keySel.value; rebuildNotes(); });
+keySel.addEventListener('change', () => { selectedKey = keySel.value; rebuildNotes(true); });
 
 for (let oct = 0; oct <= 7; oct++) {
   const opt = document.createElement('option');
@@ -708,8 +708,15 @@ for (let oct = 0; oct <= 7; oct++) {
 octaveSel.value = String(selectedOctave);
 octaveSel.addEventListener('change', () => { selectedOctave = parseInt(octaveSel.value); rebuildNotes(); });
 
-function rebuildNotes() {
+function rebuildNotes(autoAdjust = false) {
   NOTES = buildNotes(selectedScale, regionH, selectedKey, selectedOctave);
+  if (autoAdjust) {
+    while (NOTES.length > 0 && parseInt(NOTES[0].match(/\d+$/)?.[0] ?? '0') > 8 && selectedOctave > 0) {
+      selectedOctave--;
+      NOTES = buildNotes(selectedScale, regionH, selectedKey, selectedOctave);
+    }
+    octaveSel.value = String(selectedOctave);
+  }
 }
 
 dragModeBtn.addEventListener('click', () => { paintMode = false; updateUI(); });
