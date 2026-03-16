@@ -28,27 +28,33 @@
 
     /* ── Landscape: bar1 left, bar2 right, column layout ── */
     body.landscape #bar1 {
-      left: 1rem; top: 50%; transform: translateY(-50%);
+      left: 1rem; right: auto; top: 50%; bottom: auto;
+      transform: translateY(-50%);
       flex-direction: column; align-items: stretch;
       max-height: calc(100vh - 2rem); overflow-y: auto;
+      max-width: none; width: auto;
     }
     body.landscape #bar2 {
-      right: 1rem; top: 50%; transform: translateY(-50%);
+      right: 1rem; left: auto; top: 50%; bottom: auto;
+      transform: translateY(-50%);
       flex-direction: column; align-items: stretch;
       max-height: calc(100vh - 2rem); overflow-y: auto;
+      max-width: none; width: auto;
     }
     body.landscape .sep { width: auto; height: 1px; margin: 0.1rem 0; }
 
     /* ── Portrait: bar1 top, bar2 bottom, row layout ── */
     body.portrait #bar1 {
-      top: 1rem; left: 50%; transform: translateX(-50%);
+      top: 1rem; bottom: auto; left: 1rem; right: 1rem;
+      transform: none;
       flex-direction: row; flex-wrap: wrap; justify-content: center;
-      max-width: calc(100vw - 2rem);
+      max-width: none; width: auto; max-height: none;
     }
     body.portrait #bar2 {
-      bottom: 1rem; left: 50%; transform: translateX(-50%);
+      bottom: 1rem; top: auto; left: 1rem; right: 1rem;
+      transform: none;
       flex-direction: row; flex-wrap: wrap; justify-content: center;
-      max-width: calc(100vw - 2rem);
+      max-width: none; width: auto; max-height: none;
     }
     body.portrait .sep { width: 1px; height: 1.2em; margin: 0 0.1rem; }
 
