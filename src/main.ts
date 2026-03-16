@@ -695,7 +695,7 @@ for (const note of CHROMATIC) {
 keySel.value = selectedKey;
 keySel.addEventListener('change', () => { selectedKey = keySel.value; rebuildNotes(); });
 
-for (let oct = 2; oct <= 7; oct++) {
+for (let oct = 0; oct <= 7; oct++) {
   const opt = document.createElement('option');
   opt.value = String(oct); opt.textContent = `C${oct}`;
   octaveSel.appendChild(opt);
