@@ -165,7 +165,7 @@ function render() {
   ctx.fillStyle = COLOR_BACKGROUND;
   ctx.fillRect(0, 0, w, h);
 
-  const inner  = cs - GAP;
+  const inner  = Math.max(0, cs - GAP);
   const radius = inner * 0.2;
 
   const minGx = Math.floor(-camX / cs) - 1;
