@@ -46,7 +46,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
   {
     id: 'arp', name: 'Arp', dur: '8n', attackMs: 10, releaseMs: 400,
     make() {
-      const s = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 64,
+      const s = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'triangle' },
         envelope:   { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.4 },
       }).connect(compressor);
@@ -57,7 +57,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
   {
     id: 'warm', name: 'Warm', dur: '4n', attackMs: 50, releaseMs: 1200,
     make() {
-      const s = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 64,
+      const s = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'fatsawtooth', count: 3, spread: 20 } as any,
         envelope:   { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1.2 },
       }).connect(compressor);
@@ -101,7 +101,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
     id: 'pad', name: 'Pad', dur: '2n', attackMs: 300, releaseMs: 2000,
     make() {
       const reverb = new Tone.Reverb({ decay: 4, wet: 0.6 }).connect(compressor);
-      const s = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 64,
+      const s = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'fatsine', count: 4, spread: 30 } as any,
         envelope:   { attack: 0.3, decay: 0.5, sustain: 0.9, release: 2 },
       }).connect(reverb);
@@ -115,7 +115,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
   {
     id: 'marimba', name: 'Marimba', dur: '8n', attackMs: 2, releaseMs: 100,
     make() {
-      const s = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 64,
+      const s = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'sine' },
         envelope:   { attack: 0.002, decay: 0.6, sustain: 0, release: 0.1 },
       }).connect(compressor);
@@ -126,7 +126,7 @@ export const SOUND_PRESETS: SoundPreset[] = [
   {
     id: 'bass', name: 'Bass', dur: '4n', attackMs: 50, releaseMs: 500,
     make() {
-      const s = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 64,
+      const s = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'triangle' },
         envelope:   { attack: 0.05, decay: 0.2, sustain: 0.8, release: 0.5 },
       }).connect(compressor);
