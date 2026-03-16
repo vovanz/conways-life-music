@@ -17,7 +17,7 @@ const GAP       = 2;
 const BASE_CELL = 30; // cell size in pixels at zoom = 1
 
 // ── Active scale / key / octave ────────────────────────────────────────────
-let selectedScale  = SCALES['majorPentatonic'];
+let selectedScale  = SCALES['minorPentatonic'];
 let selectedKey    = 'C';
 let selectedOctave = 4;
 let NOTES: string[] = buildNotes(selectedScale, REGION, selectedKey, selectedOctave);
@@ -67,8 +67,9 @@ let isDoubleClickPan = false;
 let lastClickTime    = 0;
 let lastTouchTime    = 0;
 
-let currentPreset: SoundPreset = SOUND_PRESETS[0];
-let activeSynth:   ActiveSynth = SOUND_PRESETS[0].make();
+const defaultPreset = SOUND_PRESETS.find(p => p.id === 'piano') ?? SOUND_PRESETS[0];
+let currentPreset: SoundPreset = defaultPreset;
+let activeSynth:   ActiveSynth = defaultPreset.make();
 
 // ── Glow ───────────────────────────────────────────────────────────────────
 interface GlowEntry { startMs: number; attackMs: number; holdMs: number; releaseMs: number; }
@@ -140,12 +141,6 @@ function resetCamera() {
   camY = availY + availH / 2 - regionCY * cellSize();
 }
 
-function seed() {
-  [[1,0],[2,1],[0,2],[1,2],[2,2]].forEach(([x,y]) => current.add(key(x, y)));  // glider
-  [[9,10],[10,10],[11,10]].forEach(([x,y]) => current.add(key(x, y)));          // blinker
-  [[13,14],[14,14],[12,15],[13,15],[13,16]].forEach(([x,y]) => current.add(key(x, y))); // r-pent
-}
-seed();
 
 // ── Canvas / rendering ─────────────────────────────────────────────────────
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -933,6 +928,16 @@ document.addEventListener('keydown', async e => {
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && playing) lastBeat = performance.now();
 });
+
+// Sync selects to defaults
+soundSel.value  = 'piano';
+scaleSel.value  = 'minorPentatonic';
+
+// Seed initial grid
+for (let gx = regionX; gx < regionX + regionW; gx++)
+  for (let gy = regionY; gy < regionY + regionH; gy++)
+    if (Math.random() < 0.3) current.add(key(gx, gy));
+next = nextGen(current);
 
 resize();
 window.addEventListener('resize', resize);
