@@ -277,6 +277,11 @@ function render() {
 }
 
 // ── Sequencer ──────────────────────────────────────────────────────────────
+function clampNote(note: string): string {
+  const oct = parseInt(note.match(/\d+$/)?.[0] ?? '0');
+  return oct <= 8 ? note : note.replace(/\d+$/, '8');
+}
+
 function onBeat() {
   const col = regionX + scanCol;
   const notesToPlay: string[] = [];
@@ -291,7 +296,7 @@ function onBeat() {
     const k = key(col, regionY + row);
     if (next.has(k)) { notesToPlay.push(NOTES[row]); glowingCells.set(k, glowEntry); }
   }
-  if (notesToPlay.length > 0) activeSynth.play(notesToPlay, currentPreset.dur);
+  if (notesToPlay.length > 0) activeSynth.play(notesToPlay.map(clampNote), currentPreset.dur);
 
   // Advance the scan line after the attack has had time to bloom
   const delay = currentPreset.attackMs;
@@ -333,7 +338,7 @@ function stopPlaying() {
 
 // ── Region ─────────────────────────────────────────────────────────────────
 function applyRegion(x: number, y: number, w: number, h: number) {
-  regionX = x; regionY = y; regionW = w; regionH = Math.min(h, 64);
+  regionX = x; regionY = y; regionW = w; regionH = Math.min(h, 40);
   if (scanCol >= regionW) scanCol = 0;
   rebuildNotes();
 }
