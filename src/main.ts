@@ -714,6 +714,10 @@ document.addEventListener('keydown', async e => {
 });
 
 // ── Boot ───────────────────────────────────────────────────────────────────
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && playing) lastBeat = performance.now();
+});
+
 resize();
 window.addEventListener('resize', resize);
 updateUI();
