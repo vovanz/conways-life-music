@@ -12,10 +12,11 @@ import {
 import { SCALES, CHROMATIC, buildNotes } from './scales';
 
 // ── Constants ──────────────────────────────────────────────────────────────
-const REGION = 20;
-const GAP    = 2;
+const REGION    = 20;
+const GAP       = 2;
+const BASE_CELL = 30; // cell size in pixels at zoom = 1
 
-// Active scale / key / octave — rebuilt when any of these change
+// ── Active scale / key / octave ────────────────────────────────────────────
 let selectedScale  = SCALES['majorPentatonic'];
 let selectedKey    = 'C';
 let selectedOctave = 4;
@@ -24,19 +25,8 @@ let NOTES: string[] = buildNotes(selectedScale, REGION, selectedKey, selectedOct
 // ── Game of Life ───────────────────────────────────────────────────────────
 type Grid = Set<string>;
 
-/**
- * Serialises a grid coordinate into the string key used by the sparse cell set.
- * Keeping this in one place ensures encode/lookup always use the same format.
- */
-function key(x: number, y: number): string {
-  return `${x},${y}`;
-}
+function key(x: number, y: number): string { return `${x},${y}`; }
 
-/**
- * Computes the next Conway generation from a sparse cell set.
- * Only live cells and their neighbours are examined, so the cost scales
- * with the live population rather than the size of the visible canvas.
- */
 function nextGen(grid: Grid): Grid {
   const counts = new Map<string, number>();
   for (const k of grid) {
@@ -75,7 +65,6 @@ let activeSynth:   ActiveSynth = SOUND_PRESETS[0].make();
 // ── Sequencer region ────────────────────────────────────────────────────────
 let regionX = 0, regionY = 0, regionW = REGION, regionH = REGION;
 
-// Resize handles — one per corner and edge midpoint
 const HANDLES = [
   { id: 'tl', fx: 0,   fy: 0,   affL: true,  affR: false, affT: true,  affB: false },
   { id: 'tc', fx: 0.5, fy: 0,   affL: false, affR: false, affT: true,  affB: false },
@@ -94,16 +83,50 @@ const HANDLE_CURSORS: Record<string, string> = {
   bl: 'sw-resize', bc: 's-resize',  br: 'se-resize',
 };
 
-// Area interaction state
 let draggingHandle: Handle | null = null;
 let selectingArea  = false;
 let selectStart:   { gx: number; gy: number } | null = null;
 let selectEnd:     { gx: number; gy: number } | null = null;
 
+// ── Camera ─────────────────────────────────────────────────────────────────
+let zoom = 1;
+let camX = 0;
+let camY = 0;
+
+function cellSize(): number { return BASE_CELL * zoom; }
+
+function pixelToCell(px: number, py: number): { gx: number; gy: number } {
+  const cs = cellSize();
+  return { gx: Math.floor((px - camX) / cs), gy: Math.floor((py - camY) / cs) };
+}
+
 /**
- * Places a few well-known patterns into the starting grid so the app opens
- * with something visually interesting rather than a blank canvas.
+ * Resets zoom and pan so the sequencer region is centered in the space
+ * between the two bars. Called on first load and on orientation change.
  */
+function resetCamera() {
+  const bar1 = document.getElementById('bar1')!.getBoundingClientRect();
+  const bar2 = document.getElementById('bar2')!.getBoundingClientRect();
+  const landscape = window.innerWidth > window.innerHeight;
+
+  let availX: number, availY: number, availW: number, availH: number;
+  if (landscape) {
+    availX = bar1.right;  availY = 0;
+    availW = bar2.left - bar1.right;  availH = window.innerHeight;
+  } else {
+    availX = 0;  availY = bar1.bottom;
+    availW = window.innerWidth;  availH = bar2.top - bar1.bottom;
+  }
+
+  const cs = Math.min(availW, availH) * 0.85 / REGION;
+  zoom = cs / BASE_CELL;
+
+  const regionCX = regionX + regionW / 2;
+  const regionCY = regionY + regionH / 2;
+  camX = availX + availW / 2 - regionCX * cellSize();
+  camY = availY + availH / 2 - regionCY * cellSize();
+}
+
 function seed() {
   [[1,0],[2,1],[0,2],[1,2],[2,2]].forEach(([x,y]) => current.add(key(x, y)));  // glider
   [[9,10],[10,10],[11,10]].forEach(([x,y]) => current.add(key(x, y)));          // blinker
@@ -115,72 +138,6 @@ seed();
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const ctx    = canvas.getContext('2d')!;
 
-/**
- * Returns the side length of a single cell in pixels.
- * Derived from the viewport's smaller dimension so the 20×20 sequencer region
- * always occupies 75% of the screen's short axis, regardless of aspect ratio.
- */
-function cellSize(): number {
-  return Math.min(window.innerWidth, window.innerHeight) * 0.75 / REGION;
-}
-
-/**
- * Returns the canvas pixel coordinates of the top-left corner of the 20×20
- * sequencer region. Used by both the renderer and the mouse-to-grid converter
- * to keep the region visually centred at all times.
- */
-function regionOffset(): { rx: number; ry: number } {
-  const cs = cellSize();
-  return {
-    rx: (window.innerWidth  - REGION * cs) / 2,
-    ry: (window.innerHeight - REGION * cs) / 2,
-  };
-}
-
-/** Snaps the canvas to the current viewport size. Called on load and on every window resize. */
-function resize() {
-  canvas.width  = window.innerWidth;
-  canvas.height = window.innerHeight;
-  positionUI();
-}
-
-/**
- * Places the #ui panel on the side of the viewport with the most space
- * relative to the active sequencer region. Re-runs on every resize.
- */
-function positionUI() {
-  const cs  = cellSize();
-  const { rx, ry } = regionOffset();
-
-  const spaceLeft   = rx + regionX * cs;
-  const spaceRight  = window.innerWidth  - (rx + (regionX + regionW) * cs);
-  const spaceTop    = ry + regionY * cs;
-  const spaceBottom = window.innerHeight - (ry + (regionY + regionH) * cs);
-
-  const max = Math.max(spaceLeft, spaceRight, spaceTop, spaceBottom);
-
-  const MARGIN = 20;
-  const uiEl = document.getElementById('ui')!;
-  uiEl.style.width = '';
-  if (max === spaceRight) {
-    uiEl.className  = 'placement-right';
-    uiEl.style.width = Math.floor(spaceRight - MARGIN * 2) + 'px';
-  } else if (max === spaceLeft) {
-    uiEl.className  = 'placement-left';
-    uiEl.style.width = Math.floor(spaceLeft - MARGIN * 2) + 'px';
-  } else if (max === spaceTop) {
-    uiEl.className = 'placement-top';
-  } else {
-    uiEl.className = 'placement-bottom';
-  }
-}
-
-/**
- * Returns whether a grid cell should appear alive in the current frame.
- * Inside the sequencer region, columns already passed by the scan line show
- * the next generation's state — creating the progressive reveal animation.
- * Everywhere else the current generation is shown.
- */
 function isAlive(gx: number, gy: number): boolean {
   const inRegion = gx >= regionX && gx < regionX + regionW &&
                    gy >= regionY && gy < regionY + regionH;
@@ -188,16 +145,10 @@ function isAlive(gx: number, gy: number): boolean {
   return current.has(key(gx, gy));
 }
 
-/**
- * Draws one frame: all visible cells, the sequencer region border, the scan
- * line, and (while paused in shape-placement mode) a translucent preview of
- * where the selected shape would land. Called every animation frame.
- */
 function render() {
-  const cs      = cellSize();
-  const { rx, ry } = regionOffset();
-  const w = canvas.width;
-  const h = canvas.height;
+  const cs = cellSize();
+  const w  = canvas.width;
+  const h  = canvas.height;
 
   ctx.fillStyle = COLOR_BACKGROUND;
   ctx.fillRect(0, 0, w, h);
@@ -205,16 +156,16 @@ function render() {
   const inner  = cs - GAP;
   const radius = inner * 0.2;
 
-  const minGx = Math.floor(-rx / cs) - 1;
-  const minGy = Math.floor(-ry / cs) - 1;
-  const maxGx = Math.ceil((w - rx) / cs) + 1;
-  const maxGy = Math.ceil((h - ry) / cs) + 1;
+  const minGx = Math.floor(-camX / cs) - 1;
+  const minGy = Math.floor(-camY / cs) - 1;
+  const maxGx = Math.ceil((w - camX) / cs) + 1;
+  const maxGy = Math.ceil((h - camY) / cs) + 1;
 
   // Cells
   for (let gx = minGx; gx <= maxGx; gx++) {
     for (let gy = minGy; gy <= maxGy; gy++) {
-      const px = rx + gx * cs + GAP / 2;
-      const py = ry + gy * cs + GAP / 2;
+      const px = camX + gx * cs + GAP / 2;
+      const py = camY + gy * cs + GAP / 2;
       ctx.fillStyle = isAlive(gx, gy) ? COLOR_CELL_ALIVE : COLOR_CELL_DEAD;
       ctx.beginPath();
       (ctx as any).roundRect(px, py, inner, inner, radius);
@@ -229,17 +180,17 @@ function render() {
     for (const [dx, dy] of cells) {
       const gx = hoverCell.gx + dx - ox;
       const gy = hoverCell.gy + dy - oy;
-      const px = rx + gx * cs + GAP / 2;
-      const py = ry + gy * cs + GAP / 2;
+      const px = camX + gx * cs + GAP / 2;
+      const py = camY + gy * cs + GAP / 2;
       ctx.beginPath();
       (ctx as any).roundRect(px, py, inner, inner, radius);
       ctx.fill();
     }
   }
 
-  // Highlighted region border
-  const bx = rx + regionX * cs;
-  const by = ry + regionY * cs;
+  // Region border
+  const bx = camX + regionX * cs;
+  const by = camY + regionY * cs;
   const bw = regionW * cs;
   const bh = regionH * cs;
   ctx.strokeStyle = COLOR_REGION_BORDER;
@@ -248,7 +199,7 @@ function render() {
 
   // Scan line
   if (playing) {
-    const lx = rx + (regionX + scanCol) * cs;
+    const lx = camX + (regionX + scanCol) * cs;
     ctx.strokeStyle = COLOR_SCAN_LINE;
     ctx.lineWidth   = 2;
     ctx.beginPath();
@@ -262,16 +213,14 @@ function render() {
     const HALF = 5;
     ctx.fillStyle = COLOR_REGION_BORDER;
     for (const h of HANDLES) {
-      const hx = bx + bw * h.fx;
-      const hy = by + bh * h.fy;
-      ctx.fillRect(hx - HALF, hy - HALF, HALF * 2, HALF * 2);
+      ctx.fillRect(bx + bw * h.fx - HALF, by + bh * h.fy - HALF, HALF * 2, HALF * 2);
     }
   }
 
   // Area selection preview
   if (selectingArea && selectStart && selectEnd) {
-    const sx = rx + Math.min(selectStart.gx, selectEnd.gx) * cs;
-    const sy = ry + Math.min(selectStart.gy, selectEnd.gy) * cs;
+    const sx = camX + Math.min(selectStart.gx, selectEnd.gx) * cs;
+    const sy = camY + Math.min(selectStart.gy, selectEnd.gy) * cs;
     const sw = (Math.abs(selectEnd.gx - selectStart.gx) + 1) * cs;
     const sh = (Math.abs(selectEnd.gy - selectStart.gy) + 1) * cs;
     ctx.strokeStyle = COLOR_REGION_BORDER;
@@ -283,12 +232,6 @@ function render() {
 }
 
 // ── Sequencer ──────────────────────────────────────────────────────────────
-/**
- * Fired once per beat. Reads the next generation's state at the current scan
- * column, triggers audio notes for every live cell found there, then advances
- * the scan column. When the column wraps around, the generation is committed
- * and a new one is pre-computed ready for the next sweep.
- */
 function onBeat() {
   const col = regionX + scanCol;
   const notesToPlay: string[] = [];
@@ -306,12 +249,6 @@ function onBeat() {
 }
 
 // ── Main loop ──────────────────────────────────────────────────────────────
-/**
- * The single requestAnimationFrame loop that drives the whole app.
- * Checks whether enough time has elapsed for the next beat, then always
- * re-renders. Separating beat timing from rendering keeps the visual smooth
- * even when the beat interval doesn't align with the display refresh rate.
- */
 function loop(ts: number) {
   if (playing && ts - lastBeat >= beatMs) {
     lastBeat += beatMs;
@@ -321,11 +258,6 @@ function loop(ts: number) {
   requestAnimationFrame(loop);
 }
 
-/**
- * Begins playback: pre-computes the first next-generation, resets the scan
- * column to 0, and anchors the beat clock. Always restarts from the left edge
- * so the visual and audio are in sync regardless of when the user resumes.
- */
 function startPlaying() {
   playing  = true;
   scanCol  = 0;
@@ -335,234 +267,275 @@ function startPlaying() {
   updateUI();
 }
 
-/** Pauses playback and updates the UI. The grid state and scan position are preserved but the scan line is hidden until the user resumes. */
 function stopPlaying() {
   playing = false;
   updateUI();
 }
 
-// ── Region resizing ────────────────────────────────────────────────────────
-/** Applies a new region, clamps scan column, rebuilds notes, repositions UI. */
+// ── Region ─────────────────────────────────────────────────────────────────
 function applyRegion(x: number, y: number, w: number, h: number) {
   regionX = x; regionY = y; regionW = w; regionH = h;
   if (scanCol >= regionW) scanCol = 0;
   rebuildNotes();
-  positionUI();
 }
 
-/** Returns the handle under the mouse, or null. */
-function handleAt(e: MouseEvent): Handle | null {
+function handleAt(e: { clientX: number; clientY: number }): Handle | null {
   const cs = cellSize();
-  const { rx, ry } = regionOffset();
-  const bx = rx + regionX * cs;
-  const by = ry + regionY * cs;
+  const bx = camX + regionX * cs;
+  const by = camY + regionY * cs;
   const bw = regionW * cs;
   const bh = regionH * cs;
-  const THRESHOLD = 10;
+  const T  = 10;
   for (const h of HANDLES) {
-    const hx = bx + bw * h.fx;
-    const hy = by + bh * h.fy;
-    if (Math.abs(e.clientX - hx) <= THRESHOLD && Math.abs(e.clientY - hy) <= THRESHOLD) {
-      return h;
-    }
+    if (Math.abs(e.clientX - (bx + bw * h.fx)) <= T &&
+        Math.abs(e.clientY - (by + bh * h.fy)) <= T) return h;
   }
   return null;
 }
 
 // ── Cell editing ───────────────────────────────────────────────────────────
-let painting: boolean | null = null;
-
-/**
- * Converts a mouse event's viewport coordinates into grid cell coordinates.
- * The inverse of the pixel calculation in render(), using the same region
- * offset so mouse interaction stays aligned with what's drawn on screen.
- */
-function cellAt(e: MouseEvent): { gx: number; gy: number } {
-  const cs      = cellSize();
-  const { rx, ry } = regionOffset();
-  return {
-    gx: Math.floor((e.clientX - rx) / cs),
-    gy: Math.floor((e.clientY - ry) / cs),
-  };
-}
-
-/**
- * Sets a single cell's state in the current grid while the app is paused.
- * The `alive` flag is captured on mousedown so a drag either draws or erases
- * consistently throughout the gesture.
- */
-function paint(gx: number, gy: number, alive: boolean) {
+function toggleCell(gx: number, gy: number) {
   const k = key(gx, gy);
-  if (alive) current.add(k);
-  else       current.delete(k);
+  if (current.has(k)) current.delete(k); else current.add(k);
 }
 
-/**
- * Stamps a preset shape into the current grid, centred on the given cell.
- * Delegates centering to shapeOffsets() so placement matches the hover preview
- * the user saw before clicking.
- */
 function placeShape(id: string, gx: number, gy: number) {
   const { cells, ox, oy } = shapeOffsets(id);
   for (const [dx, dy] of cells) current.add(key(gx + dx - ox, gy + dy - oy));
 }
 
-canvas.addEventListener('mousedown', e => {
-  if (playing) return;
+// ── Mouse input ─────────────────────────────────────────────────────────────
+const CLICK_THRESHOLD = 5;
 
-  // Draw new area
-  if (selectingArea) {
-    const { gx, gy } = cellAt(e);
-    selectStart = { gx, gy };
-    selectEnd   = { gx, gy };
-    return;
+let isPanning    = false;
+let panStartX    = 0, panStartY    = 0;
+let camStartX    = 0, camStartY    = 0;
+let pointerDownX = 0, pointerDownY = 0;
+let pointerMoved = false;
+
+canvas.addEventListener('mousedown', e => {
+  if (!playing) {
+    const h = handleAt(e);
+    if (h) { draggingHandle = h; return; }
   }
 
-  // Resize via handle
-  const h = handleAt(e);
-  if (h) { draggingHandle = h; return; }
+  pointerDownX = e.clientX; pointerDownY = e.clientY;
+  pointerMoved = false;
+  isPanning    = true;
+  panStartX = e.clientX; panStartY = e.clientY;
+  camStartX = camX;      camStartY = camY;
 
-  // Shape placement / cell painting
-  const { gx, gy } = cellAt(e);
-  if (selectedShape) { placeShape(selectedShape, gx, gy); return; }
-  painting = !current.has(key(gx, gy));
-  paint(gx, gy, painting);
+  if (selectingArea && !playing) {
+    const { gx, gy } = pixelToCell(e.clientX, e.clientY);
+    selectStart = { gx, gy }; selectEnd = { gx, gy };
+  }
 });
 
 canvas.addEventListener('mousemove', e => {
-  hoverCell = cellAt(e);
+  hoverCell = pixelToCell(e.clientX, e.clientY);
 
-  // Handle resize drag
   if (draggingHandle) {
     const cs = cellSize();
-    const { rx, ry } = regionOffset();
-    const mouseGx = Math.round((e.clientX - rx) / cs);
-    const mouseGy = Math.round((e.clientY - ry) / cs);
+    const gx = Math.round((e.clientX - camX) / cs);
+    const gy = Math.round((e.clientY - camY) / cs);
     let x1 = regionX, y1 = regionY, x2 = regionX + regionW, y2 = regionY + regionH;
-    if (draggingHandle.affL) x1 = Math.min(mouseGx, x2 - 1);
-    if (draggingHandle.affR) x2 = Math.max(mouseGx, x1 + 1);
-    if (draggingHandle.affT) y1 = Math.min(mouseGy, y2 - 1);
-    if (draggingHandle.affB) y2 = Math.max(mouseGy, y1 + 1);
+    if (draggingHandle.affL) x1 = Math.min(gx, x2 - 1);
+    if (draggingHandle.affR) x2 = Math.max(gx, x1 + 1);
+    if (draggingHandle.affT) y1 = Math.min(gy, y2 - 1);
+    if (draggingHandle.affB) y2 = Math.max(gy, y1 + 1);
     applyRegion(x1, y1, x2 - x1, y2 - y1);
     canvas.style.cursor = HANDLE_CURSORS[draggingHandle.id];
     return;
   }
 
-  // Area selection preview
-  if (selectingArea && selectStart) {
+  if (selectingArea && selectStart && isPanning) {
     selectEnd = hoverCell;
+    pointerMoved = true;
     return;
   }
 
-  // Update cursor: check for handle hover
+  if (isPanning) {
+    const dx = e.clientX - panStartX;
+    const dy = e.clientY - panStartY;
+    if (Math.hypot(dx, dy) > CLICK_THRESHOLD) pointerMoved = true;
+    camX = camStartX + dx;
+    camY = camStartY + dy;
+  }
+
+  // Cursor feedback
   if (!playing) {
     if (selectingArea || selectedShape) {
       canvas.style.cursor = 'crosshair';
+    } else if (isPanning && pointerMoved) {
+      canvas.style.cursor = 'grabbing';
     } else {
       const h = handleAt(e);
-      canvas.style.cursor = h ? HANDLE_CURSORS[h.id] : 'default';
+      canvas.style.cursor = h ? HANDLE_CURSORS[h.id] : 'grab';
     }
   }
-
-  // Cell painting drag
-  if (playing || painting === null || selectedShape) return;
-  paint(hoverCell.gx, hoverCell.gy, painting);
 });
 
-canvas.addEventListener('mouseleave', () => {
-  hoverCell      = null;
-  painting       = null;
-  draggingHandle = null;
-  if (selectingArea) { selectStart = null; selectEnd = null; }
-});
-
-canvas.addEventListener('mouseup', () => {
+canvas.addEventListener('mouseup', e => {
   if (draggingHandle) { draggingHandle = null; return; }
 
-  if (selectingArea && selectStart && selectEnd) {
+  if (selectingArea && selectStart && selectEnd && pointerMoved) {
     const x1 = Math.min(selectStart.gx, selectEnd.gx);
     const y1 = Math.min(selectStart.gy, selectEnd.gy);
     const x2 = Math.max(selectStart.gx, selectEnd.gx);
     const y2 = Math.max(selectStart.gy, selectEnd.gy);
     applyRegion(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
-    selectingArea = false;
-    selectStart   = null;
-    selectEnd     = null;
-    updateUI();
-    return;
+    selectingArea = false; selectStart = null; selectEnd = null;
+    updateUI(); isPanning = false; return;
   }
 
-  painting = null;
+  if (!pointerMoved && !playing) {
+    const { gx, gy } = pixelToCell(pointerDownX, pointerDownY);
+    if (selectedShape) placeShape(selectedShape, gx, gy);
+    else toggleCell(gx, gy);
+  }
+  isPanning = false;
 });
 
+canvas.addEventListener('mouseleave', () => {
+  hoverCell = null; isPanning = false; draggingHandle = null;
+  if (selectingArea) { selectStart = null; selectEnd = null; }
+});
+
+// Zoom toward cursor
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+  const cs     = cellSize();
+  const gx     = (e.clientX - camX) / cs;
+  const gy     = (e.clientY - camY) / cs;
+  zoom = Math.max(0.1, Math.min(20, zoom * factor));
+  camX = e.clientX - gx * cellSize();
+  camY = e.clientY - gy * cellSize();
+}, { passive: false });
+
+// ── Touch input ─────────────────────────────────────────────────────────────
+let touchStartX  = 0, touchStartY  = 0;
+let touchCamX    = 0, touchCamY    = 0;
+let touchMoved   = false;
+let pinchDist0   = 0;
+let isMultitouch = false;
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  isMultitouch = e.touches.length > 1;
+  touchMoved   = isMultitouch;
+
+  if (e.touches.length === 1) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchCamX   = camX; touchCamY = camY;
+  } else if (e.touches.length === 2) {
+    pinchDist0 = Math.hypot(
+      e.touches[1].clientX - e.touches[0].clientX,
+      e.touches[1].clientY - e.touches[0].clientY,
+    );
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && !isMultitouch) {
+    const dx = e.touches[0].clientX - touchStartX;
+    const dy = e.touches[0].clientY - touchStartY;
+    if (Math.hypot(dx, dy) > CLICK_THRESHOLD) touchMoved = true;
+    camX = touchCamX + dx;
+    camY = touchCamY + dy;
+  } else if (e.touches.length === 2) {
+    const t1 = e.touches[0], t2 = e.touches[1];
+    const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+    const mx = (t1.clientX + t2.clientX) / 2;
+    const my = (t1.clientY + t2.clientY) / 2;
+    const cs = cellSize();
+    const gx = (mx - camX) / cs; const gy = (my - camY) / cs;
+    zoom = Math.max(0.1, Math.min(20, zoom * dist / pinchDist0));
+    camX = mx - gx * cellSize(); camY = my - gy * cellSize();
+    pinchDist0 = dist;
+    touchMoved = true;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  if (!touchMoved && !isMultitouch && !playing) {
+    const t = e.changedTouches[0];
+    const { gx, gy } = pixelToCell(t.clientX, t.clientY);
+    if (selectedShape) placeShape(selectedShape, gx, gy);
+    else toggleCell(gx, gy);
+  }
+  if (e.touches.length === 0) isMultitouch = false;
+});
+
+// ── Layout ─────────────────────────────────────────────────────────────────
+let lastOrientation: 'landscape' | 'portrait' | null = null;
+
+/**
+ * Sets body class (landscape/portrait) from aspect ratio.
+ * On orientation change, resets the camera so the region stays centered
+ * in the available space between the two bars.
+ */
+function resize() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const orientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+  document.body.className = orientation;
+  if (orientation !== lastOrientation) {
+    lastOrientation = orientation;
+    requestAnimationFrame(resetCamera); // wait for bars to reflow first
+  }
+}
+
 // ── UI ─────────────────────────────────────────────────────────────────────
-const playBtn    = document.getElementById('playBtn')!;
-const bpmDisplay = document.getElementById('bpmDisplay')!;
-const clearBtn   = document.getElementById('clearBtn') as HTMLButtonElement;
-const hint       = document.getElementById('hint')!;
-const soundSel   = document.getElementById('soundSelect') as HTMLSelectElement;
-const scaleSel   = document.getElementById('scaleSelect') as HTMLSelectElement;
-const keySel     = document.getElementById('keySelect') as HTMLSelectElement;
-const octaveSel  = document.getElementById('octaveSelect') as HTMLSelectElement;
+const playBtn        = document.getElementById('playBtn')!;
+const bpmDisplay     = document.getElementById('bpmDisplay')!;
+const clearBtn       = document.getElementById('clearBtn') as HTMLButtonElement;
+const hint           = document.getElementById('hint')!;
+const soundSel       = document.getElementById('soundSelect') as HTMLSelectElement;
+const scaleSel       = document.getElementById('scaleSelect') as HTMLSelectElement;
+const keySel         = document.getElementById('keySelect') as HTMLSelectElement;
+const octaveSel      = document.getElementById('octaveSelect') as HTMLSelectElement;
 const shapeContainer = document.getElementById('shapeButtons')!;
 const selectAreaBtn  = document.getElementById('selectAreaBtn') as HTMLButtonElement;
 
-// Populate sound selector
 for (const preset of SOUND_PRESETS) {
   const opt = document.createElement('option');
-  opt.value       = preset.id;
-  opt.textContent = preset.name;
+  opt.value = preset.id; opt.textContent = preset.name;
   soundSel.appendChild(opt);
 }
-
 soundSel.addEventListener('change', () => {
   const preset = SOUND_PRESETS.find(p => p.id === soundSel.value);
   if (!preset) return;
-  activeSynth.dispose();
-  currentPreset = preset;
-  activeSynth   = preset.make();
+  activeSynth.dispose(); currentPreset = preset; activeSynth = preset.make();
 });
 
-// Populate scale selector
 for (const [id, scale] of Object.entries(SCALES)) {
   const opt = document.createElement('option');
-  opt.value       = id;
-  opt.textContent = scale.label;
+  opt.value = id; opt.textContent = scale.label;
   scaleSel.appendChild(opt);
 }
-
 scaleSel.addEventListener('change', () => {
   const scale = SCALES[scaleSel.value];
   if (scale) { selectedScale = scale; rebuildNotes(); }
 });
 
-// Populate key selector
 for (const note of CHROMATIC) {
   const opt = document.createElement('option');
-  opt.value       = note;
-  opt.textContent = note;
+  opt.value = note; opt.textContent = note;
   keySel.appendChild(opt);
 }
 keySel.value = selectedKey;
+keySel.addEventListener('change', () => { selectedKey = keySel.value; rebuildNotes(); });
 
-keySel.addEventListener('change', () => {
-  selectedKey = keySel.value;
-  rebuildNotes();
-});
-
-// Populate octave selector
 for (let oct = 2; oct <= 7; oct++) {
   const opt = document.createElement('option');
-  opt.value       = String(oct);
-  opt.textContent = `C${oct}`;
+  opt.value = String(oct); opt.textContent = `C${oct}`;
   octaveSel.appendChild(opt);
 }
 octaveSel.value = String(selectedOctave);
-
-octaveSel.addEventListener('change', () => {
-  selectedOctave = parseInt(octaveSel.value);
-  rebuildNotes();
-});
+octaveSel.addEventListener('change', () => { selectedOctave = parseInt(octaveSel.value); rebuildNotes(); });
 
 function rebuildNotes() {
   NOTES = buildNotes(selectedScale, regionH, selectedKey, selectedOctave);
@@ -575,11 +548,9 @@ selectAreaBtn.addEventListener('click', () => {
   updateUI();
 });
 
-// Populate shape buttons
 for (const [id, { label }] of Object.entries(SHAPES)) {
   const btn = document.createElement('button');
-  btn.textContent = label;
-  btn.dataset['shape'] = id;
+  btn.textContent = label; btn.dataset['shape'] = id;
   btn.addEventListener('click', () => {
     if (playing) return;
     selectedShape = selectedShape === id ? null : id;
@@ -588,29 +559,20 @@ for (const [id, { label }] of Object.entries(SHAPES)) {
   shapeContainer.appendChild(btn);
 }
 
-/**
- * Syncs every UI element to the current app state.
- * Called after any state change that affects the controls: play/pause,
- * BPM change, shape selection, or clear. Centralising this avoids scattered
- * per-element updates across the codebase.
- */
 function updateUI() {
   playBtn.textContent    = playing ? '⏸' : '▶';
   clearBtn.disabled      = playing;
   bpmDisplay.textContent = String(bpm);
 
-  // Shape buttons
   for (const btn of Array.from(shapeContainer.querySelectorAll('button'))) {
     const b = btn as HTMLButtonElement;
     b.disabled = playing;
     b.classList.toggle('active', b.dataset['shape'] === selectedShape);
   }
 
-  // Select area button
   selectAreaBtn.disabled = playing;
   selectAreaBtn.classList.toggle('active', selectingArea);
 
-  // Hint
   if (playing) {
     hint.textContent = '';
   } else if (selectingArea) {
@@ -618,29 +580,22 @@ function updateUI() {
   } else if (selectedShape) {
     hint.textContent = `placing ${SHAPES[selectedShape].label} — click to place, Esc to cancel`;
   } else {
-    hint.textContent = 'paused — click or drag to draw cells; drag handles to resize area';
+    hint.textContent = 'click to toggle · drag to pan · scroll/pinch to zoom · drag handles to resize area';
   }
 
-  // Cursor
-  canvas.style.cursor = (!playing && (selectedShape || selectingArea)) ? 'crosshair' : 'default';
+  canvas.style.cursor = (!playing && (selectedShape || selectingArea)) ? 'crosshair'
+                      : playing ? 'default'
+                      : 'grab';
 }
 
 document.getElementById('bpmDown')!.addEventListener('click', () => {
-  bpm    = Math.max(40, bpm - 10);
-  beatMs = 60000 / bpm;
-  bpmDisplay.textContent = String(bpm);
+  bpm = Math.max(40, bpm - 10); beatMs = 60000 / bpm; bpmDisplay.textContent = String(bpm);
 });
-
 document.getElementById('bpmUp')!.addEventListener('click', () => {
-  bpm    = Math.min(480, bpm + 10);
-  beatMs = 60000 / bpm;
-  bpmDisplay.textContent = String(bpm);
+  bpm = Math.min(480, bpm + 10); beatMs = 60000 / bpm; bpmDisplay.textContent = String(bpm);
 });
 
-clearBtn.addEventListener('click', () => {
-  if (playing) return;
-  current = new Set();
-});
+clearBtn.addEventListener('click', () => { if (!playing) current = new Set(); });
 
 playBtn.addEventListener('click', async () => {
   await Tone.start();
@@ -649,15 +604,12 @@ playBtn.addEventListener('click', async () => {
 
 document.addEventListener('keydown', async e => {
   if (e.code === 'Space') {
-    e.preventDefault();
-    await Tone.start();
+    e.preventDefault(); await Tone.start();
     playing ? stopPlaying() : startPlaying();
   }
   if (e.code === 'Escape') {
-    selectedShape = null;
-    selectingArea = false;
-    selectStart   = null;
-    selectEnd     = null;
+    selectedShape = null; selectingArea = false;
+    selectStart = null; selectEnd = null;
     updateUI();
   }
 });

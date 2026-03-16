@@ -9,30 +9,9 @@
     body { background: #000; overflow: hidden; }
     canvas { display: block; }
 
-    #ui {
-      position: fixed;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.5rem;
-      font-family: monospace;
-      color: #ccc;
-      user-select: none;
-    }
-
-    /* Placement classes — set by JS on load and resize */
-    #ui.placement-bottom { bottom: 1.5rem; left: 50%; transform: translateX(-50%); }
-    #ui.placement-top    { top: 1.5rem;    left: 50%; transform: translateX(-50%); }
-    #ui.placement-left   { left: 1rem;  top: 50%; transform: translateY(-50%); }
-    #ui.placement-right  { right: 1rem; top: 50%; transform: translateY(-50%); }
-
-    /* Wrap bar items when placed on a side (width is constrained by JS) */
-    #ui.placement-left .bar,
-    #ui.placement-right .bar {
-      flex-wrap: wrap;
-    }
-
+    /* ── Shared bar styles ── */
     .bar {
+      position: fixed;
       display: flex;
       align-items: center;
       gap: 0.6rem;
@@ -40,15 +19,38 @@
       border: 1px solid #3a3a3a;
       border-radius: 7px;
       padding: 0.45rem 1rem;
+      font-family: monospace;
+      color: #ccc;
+      user-select: none;
     }
 
-    .sep {
-      width: 1px;
-      height: 1.2em;
-      background: #3a3a3a;
-      margin: 0 0.1rem;
-    }
+    .sep { background: #3a3a3a; flex-shrink: 0; }
 
+    /* ── Landscape: bar1 left, bar2 right, column layout ── */
+    body.landscape #bar1 {
+      left: 1rem; top: 50%; transform: translateY(-50%);
+      flex-direction: column; align-items: stretch;
+      max-height: calc(100vh - 2rem); overflow-y: auto;
+    }
+    body.landscape #bar2 {
+      right: 1rem; top: 50%; transform: translateY(-50%);
+      flex-direction: column; align-items: stretch;
+      max-height: calc(100vh - 2rem); overflow-y: auto;
+    }
+    body.landscape .sep { width: auto; height: 1px; margin: 0.1rem 0; }
+
+    /* ── Portrait: bar1 top, bar2 bottom, row layout ── */
+    body.portrait #bar1 {
+      top: 1rem; left: 50%; transform: translateX(-50%);
+      flex-direction: row;
+    }
+    body.portrait #bar2 {
+      bottom: 1rem; left: 50%; transform: translateX(-50%);
+      flex-direction: row;
+    }
+    body.portrait .sep { width: 1px; height: 1.2em; margin: 0 0.1rem; }
+
+    /* ── Controls ── */
     button, select {
       background: #252525;
       color: #ddd;
@@ -67,16 +69,13 @@
     #bpmDisplay { width: 3ch; text-align: center; color: #eee; }
     .label { color: #666; font-size: 0.85rem; }
 
+    #shapeButtons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
     #hint {
       position: fixed;
-      top: 1.2rem;
-      left: 50%;
-      transform: translateX(-50%);
-      font-family: monospace;
-      font-size: 0.8rem;
-      color: #555;
-      pointer-events: none;
-      white-space: nowrap;
+      top: 1.2rem; left: 50%; transform: translateX(-50%);
+      font-family: monospace; font-size: 0.8rem;
+      color: #555; pointer-events: none; white-space: nowrap;
     }
   </style>
 </head>
@@ -84,36 +83,34 @@
   <canvas id="canvas"></canvas>
   <div id="hint"></div>
 
-  <div id="ui" class="placement-bottom">
-    <!-- Transport + sound -->
-    <div class="bar">
-      <button id="playBtn">▶</button>
-      <div class="sep"></div>
-      <span class="label">BPM</span>
-      <button id="bpmDown">−</button>
-      <span id="bpmDisplay">240</span>
-      <button id="bpmUp">+</button>
-      <div class="sep"></div>
-      <span class="label">Sound</span>
-      <select id="soundSelect"></select>
-      <div class="sep"></div>
-      <span class="label">Scale</span>
-      <select id="scaleSelect"></select>
-      <div class="sep"></div>
-      <span class="label">Key</span>
-      <select id="keySelect"></select>
-      <select id="octaveSelect"></select>
-      <div class="sep"></div>
-      <button id="clearBtn" disabled>Clear</button>
-    </div>
+  <!-- Bar 1: transport + sound + scale + key -->
+  <div id="bar1" class="bar">
+    <button id="playBtn">▶</button>
+    <div class="sep"></div>
+    <span class="label">BPM</span>
+    <button id="bpmDown">−</button>
+    <span id="bpmDisplay">240</span>
+    <button id="bpmUp">+</button>
+    <div class="sep"></div>
+    <span class="label">Sound</span>
+    <select id="soundSelect"></select>
+    <div class="sep"></div>
+    <span class="label">Scale</span>
+    <select id="scaleSelect"></select>
+    <div class="sep"></div>
+    <span class="label">Key</span>
+    <select id="keySelect"></select>
+    <select id="octaveSelect"></select>
+    <div class="sep"></div>
+    <button id="clearBtn" disabled>Clear</button>
+  </div>
 
-    <!-- Shape placement + area selection -->
-    <div class="bar" id="shapesBar">
-      <span class="label">Place</span>
-      <div id="shapeButtons" style="display:flex;gap:0.4rem;flex-wrap:wrap;"></div>
-      <div class="sep"></div>
-      <button id="selectAreaBtn">Select area</button>
-    </div>
+  <!-- Bar 2: shapes + area selection -->
+  <div id="bar2" class="bar">
+    <span class="label">Place</span>
+    <div id="shapeButtons"></div>
+    <div class="sep"></div>
+    <button id="selectAreaBtn">Select area</button>
   </div>
 
   <script type="module" src="/src/main.ts"></script>

@@ -30,10 +30,12 @@ The synth is a `PolySynth` using a triangle oscillator with a short envelope, so
 ### Rendering
 
 - Full-screen canvas with black background
-- Cell size: `min(viewport width, viewport height) × 0.75 / 20`
 - Cells are rounded squares: white when alive, dark gray when dead
 - A thin border marks the active sequencer region
-- The control panel auto-positions itself on the side of the screen with the most free space, and repositions on every window resize. Items within each bar switch between horizontal and vertical layout to match.
+- The grid behaves like a map: pan by dragging, zoom with scroll/pinch. Zoom is toward the cursor.
+- **Landscape viewport**: controls split into two vertical bars on the left and right edges
+- **Portrait viewport**: controls split into two horizontal bars on the top and bottom edges
+- On orientation change the camera resets to center the sequencer region in the available space
 
 ## Controls
 
@@ -43,7 +45,9 @@ The synth is a `PolySynth` using a triangle oscillator with a short envelope, so
 | `−` / `+` buttons | Decrease / increase BPM by 10 (range: 40–480, default: 240) |
 | Key dropdown | Root note for the scale (C–B chromatic, default C) |
 | Octave dropdown | Base octave of the lowest note (C2–C7, default C4) |
-| Click or drag (while paused) | Toggle cells alive / dead |
+| Click / tap (while paused) | Toggle a cell alive / dead |
+| Drag / touch-drag | Pan the grid |
+| Scroll wheel / pinch | Zoom toward cursor |
 | Drag handles on region border | Resize the sequencer area |
 | "Select area" button + drag | Draw a new sequencer area from scratch |
 
