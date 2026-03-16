@@ -42,11 +42,13 @@
     /* ── Portrait: bar1 top, bar2 bottom, row layout ── */
     body.portrait #bar1 {
       top: 1rem; left: 50%; transform: translateX(-50%);
-      flex-direction: row;
+      flex-direction: row; flex-wrap: wrap; justify-content: center;
+      max-width: calc(100vw - 2rem);
     }
     body.portrait #bar2 {
       bottom: 1rem; left: 50%; transform: translateX(-50%);
-      flex-direction: row;
+      flex-direction: row; flex-wrap: wrap; justify-content: center;
+      max-width: calc(100vw - 2rem);
     }
     body.portrait .sep { width: 1px; height: 1.2em; margin: 0 0.1rem; }
 
@@ -71,6 +73,7 @@
 
     #shapeButtons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
     body.landscape #shapeButtons { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+    body.portrait  #shapeButtons { flex-direction: row; flex-wrap: wrap; }
 
     #hint {
       position: fixed;
