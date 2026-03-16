@@ -77,7 +77,7 @@
 
     #bpmDisplay { width: 3ch; text-align: center; color: #eee; }
     .tab-group { display: flex; }
-    .tab-group button { border-radius: 0; border-right-width: 0; }
+    .tab-group button { border-radius: 0; border-right-width: 0; flex: 1; }
     .tab-group button:first-child { border-radius: 4px 0 0 4px; }
     .tab-group button:last-child  { border-radius: 0 4px 4px 0; border-right-width: 1px; }
     .label { color: #666; font-size: 0.85rem; }
@@ -101,7 +101,11 @@
   <!-- Bar 1: transport + sound + scale + key -->
   <div id="bar1" class="bar">
     <button id="playBtn">▶</button>
-    <button id="nextGenBtn" title="Skip to next generation">⏭</button>
+    <div class="tab-group">
+      <button id="nextGenBtn"   title="Skip to next generation">⏭</button>
+      <button id="nextGenBtn2x" title="Fast-forward ×2">⏭×2</button>
+      <button id="nextGenBtn4x" title="Fast-forward ×4">⏭×4</button>
+    </div>
     <div class="sep"></div>
     <span class="label">BPM</span>
     <button id="bpmDown">−</button>

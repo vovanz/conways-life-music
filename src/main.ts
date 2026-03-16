@@ -807,16 +807,16 @@ function advanceGen() {
   }
 }
 
-{
-  const btn = document.getElementById('nextGenBtn')!;
+function bindNextGenBtn(id: string, holdDelay: number, repeatInterval: number) {
+  const btn = document.getElementById(id)!;
   let holdTimeout: ReturnType<typeof setTimeout> | null = null;
   let holdInterval: ReturnType<typeof setInterval> | null = null;
 
   function startHold() {
     advanceGen();
     holdTimeout = setTimeout(() => {
-      holdInterval = setInterval(advanceGen, 100);
-    }, 200);
+      holdInterval = setInterval(advanceGen, repeatInterval);
+    }, holdDelay);
   }
 
   function stopHold() {
@@ -830,6 +830,10 @@ function advanceGen() {
   btn.addEventListener('touchstart', e => { e.preventDefault(); startHold(); }, { passive: false });
   btn.addEventListener('touchend',   stopHold);
 }
+
+bindNextGenBtn('nextGenBtn',   200, 100);
+bindNextGenBtn('nextGenBtn2x', 100,  50);
+bindNextGenBtn('nextGenBtn4x',  50,  25);
 
 clearBtn.addEventListener('click', () => { if (!playing) current = new Set(); });
 
