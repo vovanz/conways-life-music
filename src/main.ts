@@ -174,7 +174,7 @@ function stopPlaying() {
 
 // ── Region ─────────────────────────────────────────────────────────────────
 function applyRegion(x: number, y: number, w: number, h: number) {
-  regionX = x; regionY = y; regionW = w; regionH = Math.min(h, 40);
+  regionX = x; regionY = y; regionW = w; regionH = Math.min(h, 45);
   if (scanCol >= regionW) scanCol = 0;
   rebuildNotes(true);
 }
