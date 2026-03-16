@@ -1,5 +1,7 @@
 # Conway's Life Music
 
+**[Live demo](https://vovanz.github.io/conways-life-music/)**
+
 A browser toy that runs Conway's Game of Life and turns it into a step sequencer. A red scan line sweeps across a resizable region of the grid, playing musical notes whenever it crosses a live cell — lower cells play lower notes, higher cells play higher notes.
 
 ## How it works
