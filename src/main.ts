@@ -658,6 +658,7 @@ function resize() {
 const playBtn        = document.getElementById('playBtn')!;
 const bpmDisplay     = document.getElementById('bpmDisplay')!;
 const clearBtn       = document.getElementById('clearBtn') as HTMLButtonElement;
+const clearSelBtn    = document.getElementById('clearSelBtn') as HTMLButtonElement;
 const hint           = document.getElementById('hint')!;
 const soundSel       = document.getElementById('soundSelect') as HTMLSelectElement;
 const scaleSel       = document.getElementById('scaleSelect') as HTMLSelectElement;
@@ -752,6 +753,7 @@ for (const [id, { label }] of Object.entries(SHAPES)) {
 function updateUI() {
   playBtn.textContent    = playing ? '⏸' : '▶';
   clearBtn.disabled      = playing;
+  clearSelBtn.disabled   = playing;
   randomBtn.disabled     = playing;
   bpmDisplay.textContent = String(bpm);
 
@@ -788,12 +790,21 @@ function updateUI() {
                       : 'grab';
 }
 
-document.getElementById('bpmDown')!.addEventListener('click', () => {
-  bpm = Math.max(40, bpm - 10); beatMs = 60000 / bpm; bpmDisplay.textContent = String(bpm);
-});
-document.getElementById('bpmUp')!.addEventListener('click', () => {
-  bpm = Math.min(480, bpm + 10); beatMs = 60000 / bpm; bpmDisplay.textContent = String(bpm);
-});
+function bindBpmBtn(id: string, delta: number) {
+  const btn = document.getElementById(id)!;
+  const step = () => { bpm = Math.max(40, Math.min(480, bpm + delta)); beatMs = 60000 / bpm; bpmDisplay.textContent = String(bpm); };
+  let holdTimeout: ReturnType<typeof setTimeout> | null = null;
+  let holdInterval: ReturnType<typeof setInterval> | null = null;
+  const startHold = () => { step(); holdTimeout = setTimeout(() => { holdInterval = setInterval(step, 100); }, 200); };
+  const stopHold  = () => { if (holdTimeout) { clearTimeout(holdTimeout); holdTimeout = null; } if (holdInterval) { clearInterval(holdInterval); holdInterval = null; } };
+  btn.addEventListener('mousedown', startHold);
+  btn.addEventListener('mouseup',   stopHold);
+  btn.addEventListener('mouseleave', stopHold);
+  btn.addEventListener('touchstart', e => { e.preventDefault(); startHold(); }, { passive: false });
+  btn.addEventListener('touchend',   stopHold);
+}
+bindBpmBtn('bpmDown', -10);
+bindBpmBtn('bpmUp',   +10);
 
 function advanceGen() {
   if (playing) {
@@ -836,6 +847,12 @@ bindNextGenBtn('nextGenBtn2x', 100,  50);
 bindNextGenBtn('nextGenBtn4x',  50,  25);
 
 clearBtn.addEventListener('click', () => { if (!playing) current = new Set(); });
+clearSelBtn.addEventListener('click', () => {
+  if (playing) return;
+  for (let gx = regionX; gx < regionX + regionW; gx++)
+    for (let gy = regionY; gy < regionY + regionH; gy++)
+      current.delete(key(gx, gy));
+});
 
 randomBtn.addEventListener('click', () => {
   if (playing) return;
