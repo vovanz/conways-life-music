@@ -69,6 +69,10 @@
     button.active { background: #2a4a6a; border-color: #4a8abf; color: #9fd; }
 
     #bpmDisplay { width: 3ch; text-align: center; color: #eee; }
+    .tab-group { display: flex; }
+    .tab-group button { border-radius: 0; border-right-width: 0; }
+    .tab-group button:first-child { border-radius: 4px 0 0 4px; }
+    .tab-group button:last-child  { border-radius: 0 4px 4px 0; border-right-width: 1px; }
     .label { color: #666; font-size: 0.85rem; }
 
     #shapeButtons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
@@ -111,7 +115,10 @@
 
   <!-- Bar 2: mode + shapes + area selection -->
   <div id="bar2" class="bar">
-    <button id="modeBtn" title="Drag mode">🖐️</button>
+    <div class="tab-group">
+      <button id="dragModeBtn" class="active" title="Drag mode — drag to pan, click to toggle">🖐️</button>
+      <button id="paintModeBtn" title="Paint mode — drag to paint, double-click to pan">🖌️</button>
+    </div>
     <div class="sep"></div>
     <span class="label">Place</span>
     <div id="shapeButtons"></div>

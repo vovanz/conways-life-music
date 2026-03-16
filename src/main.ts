@@ -582,7 +582,8 @@ const keySel         = document.getElementById('keySelect') as HTMLSelectElement
 const octaveSel      = document.getElementById('octaveSelect') as HTMLSelectElement;
 const shapeContainer = document.getElementById('shapeButtons')!;
 const selectAreaBtn  = document.getElementById('selectAreaBtn') as HTMLButtonElement;
-const modeBtn        = document.getElementById('modeBtn') as HTMLButtonElement;
+const dragModeBtn    = document.getElementById('dragModeBtn') as HTMLButtonElement;
+const paintModeBtn   = document.getElementById('paintModeBtn') as HTMLButtonElement;
 
 for (const preset of SOUND_PRESETS) {
   const opt = document.createElement('option');
@@ -625,10 +626,8 @@ function rebuildNotes() {
   NOTES = buildNotes(selectedScale, regionH, selectedKey, selectedOctave);
 }
 
-modeBtn.addEventListener('click', () => {
-  paintMode = !paintMode;
-  updateUI();
-});
+dragModeBtn.addEventListener('click', () => { paintMode = false; updateUI(); });
+paintModeBtn.addEventListener('click', () => { paintMode = true;  updateUI(); });
 
 selectAreaBtn.addEventListener('click', () => {
   if (playing) return;
@@ -653,11 +652,8 @@ function updateUI() {
   clearBtn.disabled      = playing;
   bpmDisplay.textContent = String(bpm);
 
-  modeBtn.textContent = paintMode ? '🖌️' : '🖐️';
-  modeBtn.title = paintMode
-    ? 'Paint mode — drag to paint, double-click to pan'
-    : 'Drag mode — drag to pan, click to toggle';
-  modeBtn.classList.toggle('active', paintMode);
+  dragModeBtn.classList.toggle('active', !paintMode);
+  paintModeBtn.classList.toggle('active', paintMode);
 
   for (const btn of Array.from(shapeContainer.querySelectorAll('button'))) {
     const b = btn as HTMLButtonElement;
