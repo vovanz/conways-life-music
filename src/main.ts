@@ -580,11 +580,11 @@ paintModeBtn.addEventListener('click', () => { paintMode = true;  updateUI(); })
 
 rotateCCWBtn.addEventListener('click', () => {
   if (!selectedShape) return;
-  shapeRotations[selectedShape] = ((shapeRotations[selectedShape] ?? 0) + 3) % 4;
+  shapeRotations[selectedShape] = ((shapeRotations[selectedShape] ?? 0) + 1) % 4;
 });
 rotateCWBtn.addEventListener('click', () => {
   if (!selectedShape) return;
-  shapeRotations[selectedShape] = ((shapeRotations[selectedShape] ?? 0) + 1) % 4;
+  shapeRotations[selectedShape] = ((shapeRotations[selectedShape] ?? 0) + 3) % 4;
 });
 
 selectAreaBtn.addEventListener('click', () => {
