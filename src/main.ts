@@ -21,6 +21,7 @@ let NOTES: string[] = buildNotes(selectedScale, REGION, selectedKey, selectedOct
 // ── State ──────────────────────────────────────────────────────────────────
 let current: Grid = new Set();
 let next:    Grid = new Set();
+let cellsVersion   = 0; // incremented on every in-place mutation of `current`
 let playing        = false;
 let blinkPauseTimeout: ReturnType<typeof setTimeout> | null = null;
 let scanCol        = 0;
@@ -125,7 +126,7 @@ function onBeat() {
     scanCol++;
     if (scanCol >= regionW) {
       current = next;
-      next    = nextGen(current);
+      next    = nextGen(current).next;
       scanCol = 0;
     }
   }, delay);
@@ -141,7 +142,7 @@ function loop(ts: number) {
   render({ canvas, ctx, current, next, playing, scanCol,
            regionX, regionY, regionW, regionH,
            camX, camY, zoom, selectedShape, shapeRotations, hoverCell,
-           glowingCells, selectingArea, selectStart, selectEnd });
+           glowingCells, selectingArea, selectStart, selectEnd, cellsVersion });
   if (playing && ts - lastBeat >= beatMs) {
     lastBeat += beatMs;
     onBeat();
@@ -149,10 +150,15 @@ function loop(ts: number) {
   requestAnimationFrame(loop);
 }
 
+/**
+ * Transitions the sequencer into playing state: resets the scan column,
+ * pre-computes the first `next` generation so `onBeat` never stalls, and
+ * anchors `lastBeat` to the current timestamp so the first beat fires on time.
+ */
 function startPlaying() {
   playing  = true;
   scanCol  = 0;
-  next     = nextGen(current);
+  next     = nextGen(current).next;
   beatMs   = 60000 / bpm;
   lastBeat = performance.now();
   updateUI();
@@ -188,19 +194,36 @@ function handleAt(e: { clientX: number; clientY: number }): Handle | null {
 }
 
 // ── Cell editing ───────────────────────────────────────────────────────────
+/**
+ * Flips the live/dead state of the cell at `(gx, gy)` and bumps `cellsVersion`
+ * so the render layer knows to redraw. Used for single click-to-toggle in
+ * non-paint mode.
+ */
 function toggleCell(gx: number, gy: number) {
   const k = key(gx, gy);
   if (current.has(k)) current.delete(k); else current.add(k);
+  cellsVersion++;
 }
 
+/**
+ * Marks the cell at `(gx, gy)` alive during a drag-paint gesture. The
+ * `lastPaintedCell` guard prevents redundant Set mutations and version bumps
+ * when the pointer lingers over the same cell across multiple mousemove events.
+ */
 function paintCell(gx: number, gy: number) {
   const k = key(gx, gy);
-  if (k !== lastPaintedCell) { current.add(k); lastPaintedCell = k; }
+  if (k !== lastPaintedCell) { current.add(k); lastPaintedCell = k; cellsVersion++; }
 }
 
+/**
+ * Stamps the shape `id` (at its current rotation) onto the grid, centred on
+ * `(gx, gy)` via the shape's origin offset. Overwrites whatever cells were
+ * already there without checking for conflicts.
+ */
 function placeShape(id: string, gx: number, gy: number) {
   const { cells, ox, oy } = shapeOffsets(id, shapeRotations[id] ?? 0);
   for (const [dx, dy] of cells) current.add(key(gx + dx - ox, gy + dy - oy));
+  cellsVersion++;
 }
 
 // ── Mouse input ─────────────────────────────────────────────────────────────
@@ -638,15 +661,21 @@ function bindBpmBtn(id: string, delta: number) {
 bindBpmBtn('bpmDown', -10);
 bindBpmBtn('bpmUp',   +10);
 
+/**
+ * Steps the simulation forward by one generation on demand (the manual
+ * next-gen buttons). During playback it keeps the sequencer consistent by
+ * swapping `current`/`next`, resetting the scan column, and clearing glow;
+ * while paused it simply replaces `current` in place.
+ */
 function advanceGen() {
   if (playing) {
     current = next;
-    next    = nextGen(current);
+    next    = nextGen(current).next;
     scanCol = 0;
     lastBeat = performance.now();
     glowingCells.clear();
   } else {
-    current = nextGen(current);
+    current = nextGen(current).next;
   }
 }
 
@@ -678,12 +707,13 @@ bindNextGenBtn('nextGenBtn',   200, 100);
 bindNextGenBtn('nextGenBtn2x', 100,  50);
 bindNextGenBtn('nextGenBtn4x',  50,  25);
 
-clearBtn.addEventListener('click', () => { if (!playing) current = new Set(); });
+clearBtn.addEventListener('click', () => { if (!playing) { current = new Set(); cellsVersion++; } });
 clearSelBtn.addEventListener('click', () => {
   if (playing) return;
   for (let gx = regionX; gx < regionX + regionW; gx++)
     for (let gy = regionY; gy < regionY + regionH; gy++)
       current.delete(key(gx, gy));
+  cellsVersion++;
 });
 
 randomBtn.addEventListener('click', () => {
@@ -694,6 +724,7 @@ randomBtn.addEventListener('click', () => {
       if (Math.random() < 0.3) current.add(k); else current.delete(k);
     }
   }
+  cellsVersion++;
 });
 
 // ── Play button blink ───────────────────────────────────────────────────────
@@ -769,7 +800,7 @@ scaleSel.value  = 'minorPentatonic';
 for (let gx = regionX; gx < regionX + regionW; gx++)
   for (let gy = regionY; gy < regionY + regionH; gy++)
     if (Math.random() < 0.3) current.add(key(gx, gy));
-next = nextGen(current);
+next = nextGen(current).next;
 
 resize();
 window.addEventListener('resize', resize);

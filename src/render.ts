@@ -12,6 +12,22 @@ import {
 export const GAP       = 2;
 export const BASE_CELL = 30;
 
+// ── Offscreen cell-layer cache ──────────────────────────────────────────────
+// The cell layer (background + all cells) is drawn onto an offscreen canvas
+// and only redrawn when something relevant actually changes. Every frame we
+// just blit the cached layer and then draw the transient overlays on top.
+let _cellCanvas: HTMLCanvasElement | null = null;
+let _cellCtx: CanvasRenderingContext2D | null = null;
+const _prev = {
+  canvasW:  0,     canvasH:  0,
+  camX:     NaN,   camY:     NaN,   zoom:    NaN,
+  scanCol:  -1,    playing:  false as boolean,
+  regionX:  NaN,   regionY:  NaN,   regionW: NaN,   regionH: NaN,
+  current:      null as Grid | null,
+  next:         null as Grid | null,
+  cellsVersion: -1,
+};
+
 export const DUR_BEATS: Record<string, number> = {
   '16n': 0.25, '8n': 0.5, '4n': 1.0, '2n': 2.0,
 };
@@ -63,6 +79,7 @@ export interface RenderState {
   selectingArea: boolean;
   selectStart:   { gx: number; gy: number } | null;
   selectEnd:     { gx: number; gy: number } | null;
+  cellsVersion:  number;
 }
 
 /**
@@ -96,9 +113,6 @@ export function render(s: RenderState): void {
   const w  = canvas.width;
   const h  = canvas.height;
 
-  ctx.fillStyle = COLOR_BACKGROUND;
-  ctx.fillRect(0, 0, w, h);
-
   const inner  = Math.max(0, cs - GAP);
   const radius = inner * 0.2;
 
@@ -107,17 +121,62 @@ export function render(s: RenderState): void {
   const maxGx = Math.ceil((w - camX) / cs) + 1;
   const maxGy = Math.ceil((h - camY) / cs) + 1;
 
-  // Cells
-  for (let gx = minGx; gx <= maxGx; gx++) {
-    for (let gy = minGy; gy <= maxGy; gy++) {
-      const px = camX + gx * cs + GAP / 2;
-      const py = camY + gy * cs + GAP / 2;
-      ctx.fillStyle = isAlive(s, gx, gy) ? COLOR_CELL_ALIVE : COLOR_CELL_DEAD;
-      ctx.beginPath();
-      (ctx as any).roundRect(px, py, inner, inner, radius);
-      ctx.fill();
-    }
+  // Ensure offscreen canvas exists and matches main canvas size
+  if (!_cellCanvas) {
+    _cellCanvas = document.createElement('canvas');
+    _cellCtx    = _cellCanvas.getContext('2d')!;
   }
+  if (_cellCanvas.width !== w || _cellCanvas.height !== h) {
+    _cellCanvas.width  = w;
+    _cellCanvas.height = h;
+    _prev.current = null; // force full redraw after resize
+  }
+  const cellCtx = _cellCtx!;
+
+  // Redraw cell layer only when something that affects it has changed
+  const dirty =
+    s.cellsVersion !== _prev.cellsVersion ||
+    s.current !== _prev.current ||
+    s.next    !== _prev.next    ||
+    scanCol   !== _prev.scanCol ||
+    playing   !== _prev.playing ||
+    camX      !== _prev.camX   ||
+    camY      !== _prev.camY   ||
+    zoom      !== _prev.zoom   ||
+    regionX   !== _prev.regionX ||
+    regionY   !== _prev.regionY ||
+    regionW   !== _prev.regionW ||
+    regionH   !== _prev.regionH;
+
+  if (dirty) {
+    cellCtx.fillStyle = COLOR_BACKGROUND;
+    cellCtx.fillRect(0, 0, w, h);
+    for (let gx = minGx; gx <= maxGx; gx++) {
+      for (let gy = minGy; gy <= maxGy; gy++) {
+        const px = camX + gx * cs + GAP / 2;
+        const py = camY + gy * cs + GAP / 2;
+        cellCtx.fillStyle = isAlive(s, gx, gy) ? COLOR_CELL_ALIVE : COLOR_CELL_DEAD;
+        cellCtx.beginPath();
+        (cellCtx as any).roundRect(px, py, inner, inner, radius);
+        cellCtx.fill();
+      }
+    }
+    _prev.cellsVersion = s.cellsVersion;
+    _prev.current = s.current;
+    _prev.next    = s.next;
+    _prev.scanCol = scanCol;
+    _prev.playing = playing;
+    _prev.camX    = camX;
+    _prev.camY    = camY;
+    _prev.zoom    = zoom;
+    _prev.regionX = regionX;
+    _prev.regionY = regionY;
+    _prev.regionW = regionW;
+    _prev.regionH = regionH;
+  }
+
+  // Blit cell layer (includes background) onto the main canvas
+  ctx.drawImage(_cellCanvas, 0, 0);
 
   // Glow pass
   const nowMs = Date.now();
@@ -141,14 +200,21 @@ export function render(s: RenderState): void {
     const gy = parseInt(k.slice(comma + 1));
     const px = camX + gx * cs + GAP / 2;
     const py = camY + gy * cs + GAP / 2;
-    ctx.save();
-    ctx.shadowColor = `rgba(255, 200, 80, ${intensity})`;
-    ctx.shadowBlur  = inner * 1.5 * intensity;
-    ctx.fillStyle   = `rgba(255, 210, 100, ${intensity * 0.6})`;
-    ctx.beginPath();
-    (ctx as any).roundRect(px, py, inner, inner, radius);
-    ctx.fill();
-    ctx.restore();
+    if (cs >= 5) {
+      ctx.save();
+      ctx.shadowColor = `rgba(255, 200, 80, ${intensity})`;
+      ctx.shadowBlur  = inner * 1.5 * intensity;
+      ctx.fillStyle   = `rgba(255, 210, 100, ${intensity * 0.6})`;
+      ctx.beginPath();
+      (ctx as any).roundRect(px, py, inner, inner, radius);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.fillStyle = `rgba(255, 210, 100, ${intensity})`;
+      ctx.beginPath();
+      (ctx as any).roundRect(px, py, inner, inner, radius);
+      ctx.fill();
+    }
   }
   for (const k of toDelete) glowingCells.delete(k);
 
