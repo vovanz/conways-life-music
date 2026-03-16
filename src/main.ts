@@ -52,6 +52,7 @@ function nextGen(grid: Grid): Grid {
 let current: Grid = new Set();
 let next:    Grid = new Set();
 let playing        = false;
+let blinkPauseTimeout: ReturnType<typeof setTimeout> | null = null;
 let scanCol        = 0;
 let bpm            = 240;
 let beatMs         = 60000 / 240;
@@ -333,6 +334,8 @@ function startPlaying() {
 function stopPlaying() {
   playing = false;
   glowingCells.clear();
+  if (blinkPauseTimeout) { clearTimeout(blinkPauseTimeout); blinkPauseTimeout = null; }
+  playBtn.classList.remove('blink-pause');
   updateUI();
 }
 
@@ -490,6 +493,7 @@ canvas.addEventListener('mouseup', e => {
     updateUI(); isPanning = false; return;
   }
 
+  if (!pointerMoved && playing) { blinkPause(); }
   if (!pointerMoved && !playing) {
     const { gx, gy } = pixelToCell(pointerDownX, pointerDownY);
     if (selectedShape) placeShape(selectedShape, gx, gy);
@@ -626,6 +630,7 @@ canvas.addEventListener('touchend', e => {
     if (e.touches.length === 0) { isPainting = false; lastPaintedCell = null; }
     return;
   }
+  if (!touchMoved && !isMultitouch && playing) { blinkPause(); }
   if (!touchMoved && !isMultitouch && !playing) {
     const t = e.changedTouches[0];
     const { gx, gy } = pixelToCell(t.clientX, t.clientY);
@@ -864,14 +869,43 @@ randomBtn.addEventListener('click', () => {
   }
 });
 
+// ── Play button blink ───────────────────────────────────────────────────────
+playBtn.classList.add('blink');
+let playEverPressed = false;
+
+function blinkPause() {
+  if (!playBtn.classList.contains('blink-pause')) playBtn.classList.add('blink-pause');
+  if (blinkPauseTimeout) clearTimeout(blinkPauseTimeout);
+  blinkPauseTimeout = setTimeout(() => {
+    playBtn.classList.remove('blink-pause');
+    blinkPauseTimeout = null;
+  }, 2000);
+}
+
+function onFirstPlay() {
+  if (!playEverPressed) {
+    playEverPressed = true;
+    playBtn.classList.remove('blink');
+  }
+}
+
+// Blink pause when user pokes a button that's disabled because we're playing
+[clearBtn, clearSelBtn, randomBtn].forEach(btn => {
+  btn.addEventListener('pointerdown', () => { if (playing) blinkPause(); });
+});
+selectAreaBtn.addEventListener('pointerdown', () => { if (playing) blinkPause(); });
+shapeContainer.addEventListener('pointerdown', () => { if (playing) blinkPause(); });
+
 playBtn.addEventListener('click', async () => {
   await Tone.start();
+  onFirstPlay();
   playing ? stopPlaying() : startPlaying();
 });
 
 document.addEventListener('keydown', async e => {
   if (e.code === 'Space') {
     e.preventDefault(); await Tone.start();
+    onFirstPlay();
     playing ? stopPlaying() : startPlaying();
   }
   if (e.code === 'Escape') {
