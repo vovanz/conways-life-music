@@ -74,8 +74,9 @@ export const SOUND_PRESETS: SoundPreset[] = [
       let idx = 0;
       return {
         play(notes) {
+          const now = Tone.now();
           for (const note of notes) {
-            pool[idx % pool.length].triggerAttack(note);
+            pool[idx % pool.length].triggerAttack(note, now + idx * 0.001);
             idx++;
           }
         },
