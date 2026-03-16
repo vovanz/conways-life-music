@@ -147,7 +147,7 @@ const ctx    = canvas.getContext('2d')!;
 function isAlive(gx: number, gy: number): boolean {
   const inRegion = gx >= regionX && gx < regionX + regionW &&
                    gy >= regionY && gy < regionY + regionH;
-  if (playing && inRegion && gx < regionX + scanCol) return next.has(key(gx, gy));
+  if (playing && inRegion && gx <= regionX + scanCol) return next.has(key(gx, gy));
   return current.has(key(gx, gy));
 }
 
@@ -246,21 +246,26 @@ function onBeat() {
   }
   if (notesToPlay.length > 0) activeSynth.play(notesToPlay, currentPreset.dur);
 
-  scanCol++;
-  if (scanCol >= regionW) {
-    current = next;
-    next    = nextGen(current);
-    scanCol = 0;
-  }
+  // Advance the scan line after the attack has had time to bloom
+  const delay = currentPreset.attackMs;
+  setTimeout(() => {
+    if (!playing) return;
+    scanCol++;
+    if (scanCol >= regionW) {
+      current = next;
+      next    = nextGen(current);
+      scanCol = 0;
+    }
+  }, delay);
 }
 
 // ── Main loop ──────────────────────────────────────────────────────────────
 function loop(ts: number) {
+  render();
   if (playing && ts - lastBeat >= beatMs) {
     lastBeat += beatMs;
     onBeat();
   }
-  render();
   requestAnimationFrame(loop);
 }
 
